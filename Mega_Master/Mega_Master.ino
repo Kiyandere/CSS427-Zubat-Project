@@ -7,6 +7,10 @@ int accX, accY;
 long ultDuration;
 int ultDistance;
 
+//Microphone
+int leftMicRead[100];
+int rightMicRead[100];
+
 
 //------------ Imports -----------
 /*Will need to inport Adafruit stuff*/
@@ -14,8 +18,8 @@ int ultDistance;
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM303_Accel.h>
-
-
+#include <SPI.h>
+#include <SD.h>
 
 //----------------------------- Setup Func -------------------------------
 //WIFI module pins
@@ -106,14 +110,23 @@ void accReading()
 void micReading()
 {
   //local variable
-  int rRead;
-  int lRead;
+  int rRead = 0;
+  int lRead = 0;
 
   //add 100 sample then find the average
   for(int i = 0; i < 100; i++)
   {
-    rRead += analogRead[micRPin];
-    lRead += analogRead[micLPin];
+    //even localer variable
+    int ranalread = analogRead(micRPin);
+    int lanalread = analogRead(micLPin);
+
+    //right side
+    rRead += ranalread;
+    rightMicRead[i] = ranalread;
+
+    //left side
+    lRead += lanalread;
+    leftMicread[i] = lanalread;
   }
   rRead /= 100;
   lRead /= 100;
@@ -134,8 +147,33 @@ void micReading()
 }
 
 /*Ultrasonic reader
- * This calulate the distance
+ * This calulate the distance from the object once the rotation have been made
  */
+void ultraReading()
+{
+  //clear trigPin condition
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  ultDuration = pulseIn(echoPin, HIGH);
+
+  // Calculating the distance
+  ultDistance = ultDuration * 0.034 / 2; // Speed of sound wave divided by 2 (go and back)
+}
+
+/* Store soundwave ADC into SD card
+ *  will be send as .TXT files
+ */
+void sdSaver()
+{
+  
+}
 
 void loop() 
 {
