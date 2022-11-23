@@ -46,7 +46,7 @@ bool accelSetup()
   if (!accel.begin())
   {
     Serial.println("Error in Accel");
-    return false
+    return false;
   }
   accel.setRange(LSM303_RANGE_4G);
   accel.setMode(LSM303_MODE_NORMAL);
@@ -71,12 +71,11 @@ void setup()
   if (!accelSetup)
   {
     Serial.println("E: Accel");
-    System.exit(1);
+
   }
   if (!ultraSetup())
   {
     Serial.println("E: Ultra");
-    System.exit(1);
   }
 }
 
@@ -112,13 +111,14 @@ void micReading()
   //local variable
   int rRead = 0;
   int lRead = 0;
+  int ranalread, lanalread;
 
   //add 100 sample then find the average
   for(int i = 0; i < 100; i++)
   {
     //even localer variable
-    int ranalread = analogRead(micRPin);
-    int lanalread = analogRead(micLPin);
+     ranalread = analogRead(micRPin);
+     lanalread = analogRead(micLPin);
 
     //right side
     rRead += ranalread;
@@ -126,7 +126,7 @@ void micReading()
 
     //left side
     lRead += lanalread;
-    leftMicread[i] = lanalread;
+    leftMicRead[i] = lanalread;
   }
   rRead /= 100;
   lRead /= 100;
@@ -134,15 +134,20 @@ void micReading()
   //check which side have the biggest reading
   if (rRead < lRead) //left side
   {
-    
+    Serial.print("left ");
+    Serial.println(lanalread);
+    delay(500);
   }
   else if (rRead > lRead) //right side
   {
-    
+    Serial.print("Right ");
+    Serial.println(ranalread);
+    delay(500);
   }
   else //same
   {
-    
+    Serial.println("same ");
+    delay(500);
   }
 }
 
@@ -177,5 +182,5 @@ void sdSaver()
 
 void loop() 
 {
-  
+  micReading();
 }
