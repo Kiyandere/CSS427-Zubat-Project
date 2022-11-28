@@ -2,7 +2,11 @@
   This fun project is to create a bat-like model that is "blind" and based on audio and ultrasonic sensor. There are two platforms that are labelled as Sensor and Motor
   Platforms. Sensor platform contains the following sensors: left/right mircophones, accelrometer/compass, SD Card Adapter(Recording), UltraSonic. The Motor Platform
   will contain a step motor to move sensor platform and LCD display for debugging. Both platforms will communicate wirelessly with one another using ESP8266 NodeMCU.
-  
+ 
+ 
+ Sensor (A) ----> ESP8266 NodeMCU 12-E (B) ----> ESP8266 NodeMCU 12-E (C) ----> Motor (D)
+ 
+ Sensor (A) <---- ESP8266 NodeMCU 12-E (B) <---- ESP8266 NodeMCU 12-E (C) <---- Motor (D)
  
 2. Sensor Plaform:
     Peripheral Device that is connected to the sensors.
@@ -40,10 +44,11 @@
  
  8. Sensor Packet Data (Applied to all devices' programs):
     The packet will contain the following variables:
-      A. Float x 
-      B. Float y
-      C. int microphone_direction
-      D. int ultrasonic_distance
-      E. bool start
-      F. bool manual?
+      A. Float x [DISCONTINUED]
+      B. Float y [DISCONTINUED]
+      C. int microphone_direction -----> 0 = middle, 1 = left, 2 = right, -1 = error
+      D. int ultrasonic_distance -----> 0 = Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
+      E. bool start  -----> False = Not Sent/Awaiting, True = Begin Transmission/Sent
+      F. bool manual -----> False = Automatic, True = Manual/Remote Control
+      G. bool ACK -----> False = Was not Received any response, True = Received Packet
    
