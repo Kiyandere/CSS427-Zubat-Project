@@ -1,4 +1,4 @@
-//Test of Arduino to NodeMCU  - Node Perspective, Master Side = 50:02:91:DC:CF:83
+//Test of Arduino to NodeMCU  - Node Perspective, Slave - Sensor = 50:02:91:DC:C0:34
 #include <ArduinoWiFiServer.h>
 #include <BearSSLHelpers.h>
 #include <CertStoreBearSSL.h>
@@ -31,9 +31,9 @@ SoftwareSerial nodeMCU(rxPin, txPin);
 bool wait = false;
 bool ready = false;
 bool received = false;
-//Uno NodeMCU Broadcast MAC Address that we are sending, UDP
-//uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
-uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xC0, 0x34};
+//From Mega Sensor Side
+uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
+//uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xC0, 0x34};
 struct sensor_data {
   int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
   int8_t ultrasonic_distance = 0; // 0 = Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
@@ -118,10 +118,9 @@ void loop()
 
   if(ready)
   {
-    Serial.println("Sending from master");
+    Serial.println("Sending from Sensor");
     esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
     ready = false;
-    delay(5000);
   }
 
   if(received)
