@@ -4,9 +4,9 @@
   will contain a step motor to move sensor platform and LCD display for debugging. Both platforms will communicate wirelessly with one another using ESP8266 NodeMCU.
  
  
- Sensor (A) ----> ESP8266 NodeMCU 12-E (B) ----> ESP8266 NodeMCU 12-E (C) ----> Motor (D)
+ Sensor (A) ----> ESP8266 NodeMCU 12-E (B) ----> ESP8266 NodeMCU 12-E (C) ----> Central (D)
  
- Sensor (A) <---- ESP8266 NodeMCU 12-E (B) <---- ESP8266 NodeMCU 12-E (C) <---- Motor (D)
+ Sensor (A) <---- ESP8266 NodeMCU 12-E (B) <---- ESP8266 NodeMCU 12-E (C) <---- Central (D)
  
 2. Sensor Plaform:
     Peripheral Device that is connected to the sensors.
