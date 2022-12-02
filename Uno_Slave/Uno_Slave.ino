@@ -8,9 +8,12 @@ long ultDuration;
 int ultDistance;
 
 //Microphone
-int leftMicRead[100];
-int rightMicRead[100];
+int leftMicRead[20];
+int rightMicRead[20];
+int soundLocation = -1; //-1 error, 0 same, 1 left, 2 right
 
+//stepper
+const int stepsPerRevolution = 512;  // change this to fit the number of steps per revolution
 
 //------------ Imports -----------
 /*Will need to inport Adafruit stuff*/
@@ -20,6 +23,10 @@ int rightMicRead[100];
 #include <Adafruit_LSM303_Accel.h>
 #include <SPI.h>
 #include <SD.h>
+#include <Stepper.h>
+#include <AccelStepper.h>
+#include <MultiStepper.h>
+
 
 //----------------------------- Setup Func -------------------------------
 //WIFI module pins
@@ -35,9 +42,20 @@ SoftwareSerial unoSerial = SoftwareSerial(rxPin, txPin);
 #define micLPin A1
 #define micRPin A0
 
+//SD card pins TODO: might be moved to Master instead
+#define CS 7
+#define SCK 6
+#define MOSI 5
+#define Miso 4
+
 //Setup Accel Unquique ID
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
 
+//stepper setup
+Stepper stepper(stepsPerRevolution, 8, 10, 9, 11);
+int startLocation = 1;
+int rightTurn = 0;
+int leftTurn = 0;
 
 // Setup func for Accel
 bool accelSetup()
@@ -65,7 +83,7 @@ bool ultraSetup()
 void setup() 
 {
   //setup serial first
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   //check if something is wrong
   if (!accelSetup)
@@ -77,6 +95,9 @@ void setup()
   {
     Serial.println("E: Ultra");
   }
+
+  //setting stepper speed
+  stepper.setSpeed(10);
 }
 
 
@@ -114,7 +135,7 @@ void micReading()
   int ranalread, lanalread;
 
   //add 100 sample then find the average
-  for(int i = 0; i < 100; i++)
+  for(int i = 0; i < 20; i++)
   {
     //even localer variable
      ranalread = analogRead(micRPin);
@@ -128,25 +149,23 @@ void micReading()
     lRead += lanalread;
     leftMicRead[i] = lanalread;
   }
-  rRead /= 100;
-  lRead /= 100;
+  rRead /= 20;
+  lRead /= 20;
 
   //check which side have the biggest reading
-  if (rRead < lRead) //left side
+  if ((rRead < lRead) && (lRead - rRead) > 10) //left side
   {
-    Serial.print("left ");
-    Serial.println(lanalread);
+    soundLocation = 1;
     delay(500);
   }
-  else if (rRead > lRead) //right side
+  else if ((rRead > lRead) && (rRead - lRead) > 10) //right side
   {
-    Serial.print("Right ");
-    Serial.println(ranalread);
+    soundLocation = 2;
     delay(500);
   }
-  else //same
+  else if ((rRead > lRead) && (rRead - lRead) > 10) //same
   {
-    Serial.println("same ");
+    soundLocation = 0;
     delay(500);
   }
 }
@@ -180,7 +199,56 @@ void sdSaver()
   
 }
 
+
+/* Stepper
+ *  Turn left or right by 15 degree
+ */
+ void stepperRightTurn()
+ {
+  rightTurn = (stepsPerRevolution);
+  stepper.step(rightTurn);
+  delay(500);
+ }
+ 
+ void stepperLeftTurn()
+ {
+  leftTurn = (-stepsPerRevolution);
+  stepper.step(leftTurn);
+  delay(500);
+ }
+
+
+/*Reset
+ * This reset every value at the moment
+ */
+void reset()
+{
+  //Ultrasonic
+  ultDuration = 0;
+  ultDistance = 0;
+  
+  //Microphone
+  soundLocation = -1;
+  for (int i = 0; i < 20; i++)
+  {
+    leftMicRead[i] = 0;
+    rightMicRead[i] = 0;
+  }
+
+  //stepper
+  rightTurn = 0;
+  leftTurn = 0;
+}
+
+/*Packaging
+ * This package all the necessary data to send the goods over
+ */
+String packaging()
+{
+  
+}
+
 void loop() 
 {
-  micReading();
+  
 }
