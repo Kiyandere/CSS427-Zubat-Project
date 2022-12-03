@@ -56,8 +56,8 @@ SoftwareSerial unoSerial = SoftwareSerial(rxPin, txPin);
 #define trigPin 9
 
 //Microphone pins
-#define micLPin A1
-#define micRPin A0
+#define micLPin A0
+#define micRPin A1
 
 
 //Setup Accel Unquique ID
