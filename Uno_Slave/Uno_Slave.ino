@@ -1,20 +1,3 @@
-//----------- Global Variable ----------
-//Accel + Magnet
-int magX, magY;
-int accX, accY;
-
-//Ultrasonic
-long ultDuration;
-int ultDistance;
-
-//Microphone
-int leftMicRead[20];
-int rightMicRead[20];
-int soundLocation = -1; //-1 error, 0 same, 1 left, 2 right
-
-//stepper
-const int stepsPerRevolution = 512;  // change this to fit the number of steps per revolution
-
 //------------ Imports -----------
 /*Will need to inport Adafruit stuff*/
 #include <SoftwareSerial.h>
@@ -27,6 +10,40 @@ const int stepsPerRevolution = 512;  // change this to fit the number of steps p
 #include <AccelStepper.h>
 #include <MultiStepper.h>
 
+//----------- Global Variable ----------
+//Accel heading
+int accHeading;
+
+//Ultrasonic
+long ultDuration;
+int ultDistance;
+
+//Microphone
+int leftMicRead[20];
+int rightMicRead[20];
+int lMic;
+int rMic;
+int soundLocation = -1; //-1 error, 0 same, 1 left, 2 right
+
+//stepper
+const int stepsPerRevolution = 512;  // change this to fit the number of steps per revolution
+
+//Package array
+int packageArray[8];
+
+//struct
+struct sensor_data {
+  int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
+  int8_t ultrasonic_distance = 0; // 0 = ultrasonic_distance Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
+  int16_t leftMic = 0;
+  int16_t rightMic = 0;
+  int16_t heading = 0;
+  bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
+  int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
+  bool ack = false; //False = Was not Received any response, True = Received Packet
+}
+struct sensor_data packet;
+struct sensor_data incomingPacket;
 
 //----------------------------- Setup Func -------------------------------
 //WIFI module pins
@@ -42,11 +59,6 @@ SoftwareSerial unoSerial = SoftwareSerial(rxPin, txPin);
 #define micLPin A1
 #define micRPin A0
 
-//SD card pins TODO: might be moved to Master instead
-#define CS 7
-#define SCK 6
-#define MOSI 5
-#define Miso 4
 
 //Setup Accel Unquique ID
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
@@ -103,29 +115,27 @@ void setup()
 
 //----------------------------- Active Func -------------------------------
 
-/*Accel + Mag Reading
- * Z is not needed
- */
-void magReading()
-{
-  sensors_event_t event;
-  accel.getEvent(&event);
-  magX = event.magnetic.x;
-  magY = event.magnetic.y;
-}
-void accReading()
-{
-  sensors_event_t event;
-  accel.getEvent(&event);
-  accX = event.acceleration.x;
-  accY = event.acceleration.y;
-}
+// /*Accel + Mag Reading
+//  * Z is not needed
+//  */
+// void magReading()
+// {
+//   sensors_event_t event;
+//   accel.getEvent(&event);
+//   magX = event.magnetic.x;
+//   magY = event.magnetic.y;
+// }
+// void accReading()
+// {
+//   sensors_event_t event;
+//   accel.getEvent(&event);
+//   accX = event.acceleration.x;
+//   accY = event.acceleration.y;
+// }
 
 /*Microphone reader
  * This will also calculate the distance from the microphone and how far left/right the sound is
  * 
- * Will need to be adapt for outlier +/-
- * TODO: need research on how to calculate distance from sound
  */
 void micReading()
 {
@@ -151,6 +161,9 @@ void micReading()
   }
   rRead /= 20;
   lRead /= 20;
+
+  //save
+
 
   //check which side have the biggest reading
   if ((rRead < lRead) && (lRead - rRead) > 10) //left side
@@ -189,14 +202,6 @@ void ultraReading()
 
   // Calculating the distance
   ultDistance = ultDuration * 0.034 / 2; // Speed of sound wave divided by 2 (go and back)
-}
-
-/* Store soundwave ADC into SD card
- *  will be send as .TXT files
- */
-void sdSaver()
-{
-  
 }
 
 
@@ -243,10 +248,73 @@ void reset()
 /*Packaging
  * This package all the necessary data to send the goods over
  */
-String packaging()
+void packaging(String data)
 {
+  String temp = "";
+  int count = 0;
   
+  for(int i = 0; i < data.length(); i++)
+  {
+    char ch = data.charAt(i);
+    if(ch == '<' || ch == '>')
+    {
+      continue;
+    }
+    else if(ch == ',')
+    {
+      packetArray[count] = temp.toInt();
+      count++;
+      temp = "";
+    }
+    else
+    {
+      temp += ch;
+    }
+  }
+
+  //Adding data into array
+  packArray[0] = soundLocation;
+  packArray[1] = ultDistance;
+  packArray[2] = lMic;
+  packArray[3] = rMic;
+  packArray[4] = accHeading;
+  packArray[5] =  false; //start
+  packArray[6] =  0; //manual
+  packArray[7] =  true; //ack
+
+  displayPackageData();
+
+  //populate Pocket Data
+  packet.microphone_direction = packArray[0];
+  packet.ultrasonic_distance = packArray[1];
+  packet.start = packArray[2];
+  packet.manual = packArray[3];
+  packet.ack = packArray[4];
+
 }
+
+//----------------------------- Debug Func -------------------------------
+
+void displayPackageData()
+{
+  Serial.print("Packet Microhpone = ");
+  Serial.print(packetArray[0]);
+  Serial.println();
+  Serial.print("Packet Ultrasonic = ");
+  Serial.print(packetArray[1]);
+  Serial.println();
+  Serial.print("Packet Start = ");
+  Serial.print(packetArray[2]);
+  Serial.println();
+  Serial.print("Packet Manual = ");
+  Serial.print(packetArray[3]);
+  Serial.println();
+  Serial.print("Packet Ack = ");
+  Serial.print(packetArray[4]);
+  Serial.println();
+}
+
+//----------------------------- Running Func -------------------------------
 
 void loop() 
 {
