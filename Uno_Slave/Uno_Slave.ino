@@ -292,6 +292,29 @@ void packaging(String data)
 
 }
 
+String convertPacketToString()
+{
+  String converter = "";
+  converter += "<";
+  converter += String(packet.microphone_direction);
+  converter += ",";
+  converter += String(packet.ultrasonic_distance);
+  converter += ",";
+  converter += String(packet.leftMic);
+  converter += ",";
+  converter += String(packet.rightMic);
+  converter += ";";
+  converter += String(packet.heading);
+  converter += ",";
+  converter += String(packet.start);
+  converter += ",";
+  converter += String(packet.manual);
+  converter += ",";
+  converter += String(packet.ack);
+  converter += ">";
+  return converter;
+}
+
 //----------------------------- Debug Func -------------------------------
 
 void displayPackageData()
