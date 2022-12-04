@@ -10,6 +10,8 @@ SerialTransfer dataTransfer;
 SoftwareSerial nodeMCUSerial(2,3);
 int packetArray[8];
 String sender = "";
+String incomingData = "";
+String curData = "";
 bool ready = false;
 bool sensorReady = false;
 int compassX = -1;
@@ -53,6 +55,7 @@ void loop() {
   if(nodeMCUSerial.available())
   {
     //Store Data into SD Card and print out incoming data from Node Side
+    readIncomingData();
   }
   if(Serial.available())
   {
@@ -126,9 +129,8 @@ void readCommand(char command)
 
 void readIncomingData()
 {
-  while()
   //Serial.println("We are reading something");
-  char temp = nodeMCU.read();
+  char temp = nodeMCUSerial.read();
   incomingData += String(temp);
   if(temp == '>')
   {
@@ -137,7 +139,6 @@ void readIncomingData()
     curData = incomingData;
     incomingData  = "";
     convertDataIntoPacket(data);
-    ready = true;
   }
 }
 

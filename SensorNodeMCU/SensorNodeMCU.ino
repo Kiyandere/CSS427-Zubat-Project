@@ -37,8 +37,11 @@ uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
 struct sensor_data {
   int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
   int8_t ultrasonic_distance = 0; // 0 = Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
+  int16_t leftMic = 0;  // 0 = Never asked or request, anything else is from manual
+  int16_t rightMic = 0; // 0 = Never asked or request, anything else is from manual
+  int16_t heading = 0; // 0 = Never asked or request, anything else is from manual
   bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
-  bool manual = false; //False = Automatic, True = Manual Control
+  int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
   bool ack = false; //False = Was not Received any response, True = Received Packet
 };
 struct sensor_data packet;
@@ -58,14 +61,20 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   memcpy(&incomingPacket, incomingData, sizeof(incomingPacket));
   Serial.print("Bytes received: ");
   Serial.println(len);
-  packet.microphone_direction = incomingPacket.microphone_direction;
-  packet.ultrasonic_distance = incomingPacket.ultrasonic_distance;
-  packet.start = incomingPacket.start;
-  packet.manual = incomingPacket.manual;
-  packet.ack = incomingPacket.ack;
   received = true;
 }
 
+void transferIncomingIntoPacket()
+{
+  packet.microphone_direction = incomingPacket.microphone_direction;
+  packet.ultrasonic_distance = incomingPacket.ultrasonic_distance;
+  packet.leftMic = incomingPacket.leftMic;
+  packet.rightMic = incomingPacket.rightMic;
+  packet.heading = incomingPacket.heading;
+  packet.start = incomingPacket.start;
+  packet.manual = incomingPacket.manual;
+  packet.ack = incomingPacket.ack;
+}
 
 void printIncomingReadings()
 {
@@ -126,10 +135,37 @@ void loop()
   if(received)
   {
     printIncomingReadings();
+    cli();
+    transferIncomingIntoPacket();
+    sei();
+    String sendMessage = convertPacketToString();
+    nodeMCU.println(sendMessage);   //Send to the Sensor Platform
     received = false;
   }
 }
 
+String convertPacketToString()
+{
+  String converter = "";
+  converter += "<";
+  converter += String(packet.microphone_direction);
+  converter += ",";
+  converter += String(packet.ultrasonic_distance);
+  converter += ",";
+  converter += String(packet.leftMic);
+  converter += ",";
+  converter += String(packet.rightMic);
+  converter += ",";
+  converter += String(packet.heading);
+  converter += ",";
+  converter += String(packet.start);
+  converter += ",";
+  converter += String(packet.manual);
+  converter += ",";
+  converter += String(packet.ack);
+  converter += ">";
+  return converter;
+}
 
 void readIncomingData()
 {
@@ -147,6 +183,7 @@ void readIncomingData()
   }
 }
 
+
 void convertDataIntoPacket(String data)
 {
   String temp = "";
@@ -163,6 +200,11 @@ void convertDataIntoPacket(String data)
     {
       packetArray[count] = temp.toInt();
       count++;
+      if(count >= sizeof(packetArray))
+      {
+        Serial.println("Error in packet size or conversion");
+        break;
+      }
       temp = "";
     }
     else
@@ -182,21 +224,33 @@ void displayData()
   Serial.print("Packet Ultrasonic = ");
   Serial.print(packetArray[1]);
   Serial.println();
-  Serial.print("Packet Start = ");
+  Serial.print("Packet Left Microphone Reading = ");
   Serial.print(packetArray[2]);
   Serial.println();
-  Serial.print("Packet Manual = ");
+  Serial.print("Packet Right Microphone Reading = ");
   Serial.print(packetArray[3]);
   Serial.println();
-  Serial.print("Packet Ack = ");
+  Serial.print("Packet Compass Heading = ");
   Serial.print(packetArray[4]);
+  Serial.println();
+  Serial.print("Packet Start = ");
+  Serial.print(packetArray[5]);
+  Serial.println();
+  Serial.print("Packet Manual = ");
+  Serial.print(packetArray[6]);
+  Serial.println();
+  Serial.print("Packet Ack = ");
+  Serial.print(packetArray[7]);
   Serial.println();
 }
 void populatePacketData()
 {
   packet.microphone_direction = packetArray[0];
   packet.ultrasonic_distance = packetArray[1];
-  packet.start = packetArray[2];
-  packet.manual = packetArray[3];
-  packet.ack = packetArray[4];
+  packet.microphone_direction = packetArray[2];
+  packet.ultrasonic_distance = packetArray[3];
+  packet.microphone_direction = packetArray[4];
+  packet.start = packetArray[5];
+  packet.manual = packetArray[6];
+  packet.ack = packetArray[7];
 }
