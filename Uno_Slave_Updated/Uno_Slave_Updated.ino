@@ -30,7 +30,8 @@
 //#include <WiFi.h>
 #include <espnow.h>
 #include <SoftwareSerial.h>
-
+#define rxPin 10 //Pin to connect to D6
+#define txPin 11 //Pin to connect to D7
 //------------------------------- Wifi stuff -------------------------------
 //struct for packet
 struct sensor_data {
@@ -47,19 +48,20 @@ struct sensor_data packet;
 struct sensor_data incomingPacket;
 
 //packet array for wifi
-int packageArray[8];
+int packetArray[8];
 
 //wifi global variable
 String incomingData = "";
 String curData = "";
 
-//Setup softwareSerial
-SoftwareSerial nodeMCU(rxPin, txPin);
 
 //wifi checkpoint
 bool wait = false;
 bool ready = false;
 bool received = false;
+
+//Setup softwareSerial
+SoftwareSerial nodeMCU(rxPin, txPin);
 
 //MAC address: 
 //uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
@@ -71,7 +73,7 @@ const int stepsPerRevolution = 512;  // change this to fit the number of steps p
 
 //local data
 int micLocal = -1;
-int ultraLocal = 0
+int ultraLocal = 0;
 bool leftMicLocal = false;
 bool rightMicLocal = false;
 int headingLocal = 0;
@@ -80,10 +82,6 @@ int manual = 0;
 bool ack = false;
 
 //------------------------------- Pins Define -------------------------------
-//WIFI module pins
-#define rxPin 10 //D6
-#define txPin 11 //D7
-
 //Ultrasonic pins
 #define echoPin 5
 #define trigPin 6
@@ -102,6 +100,8 @@ bool ack = false;
 //Setup Accel Unquique ID
 Adafruit_LSM303_Mag_Unified accel = Adafruit_LSM303_Mag_Unified(54321);
 
+//Set up the Stepper motor variable
+Stepper stepper(stepsPerRevolution, in1, in2, in3, in4);
 void setup() {
   //setup serial first
   Serial.begin(115200);
@@ -120,8 +120,8 @@ void setup() {
   pinMode (echoPin, INPUT);
 
   //Mic setup
-  pinMode(leftSensorPin, INPUT);
-  pinMode(rightSensorPin, INPUT);
+  pinMode(micLPin, INPUT);
+  pinMode(micRPin, INPUT);
 
   //setting stepper speed
   stepper.setSpeed(20);
@@ -194,7 +194,7 @@ void ultraReading()
   int ultDuration = pulseIn(echoPin, HIGH);
 
   // Calculating the distance
-  ultDistance = ultDuration * 0.034 / 2; // Speed of sound wave divided by 2 (go and back)
+  int ultDistance = ultDuration * 0.034 / 2; // Speed of sound wave divided by 2 (go and back)
 
   //Save into packet
   ultraLocal = ultDistance;
@@ -206,23 +206,23 @@ void ultraReading()
  */
 void stepperRightTurn()
 {
-  rightTurn = (stepsPerRevolution);
+  int rightTurn = (stepsPerRevolution);
   stepper.step(rightTurn);
   delay(500);
 }
 void stepperLeftTurn()
 {
-  leftTurn = (-stepsPerRevolution);
+  int leftTurn = (-stepsPerRevolution);
   stepper.step(leftTurn);
   delay(500);
 }
 void stepperReset()
 {
-  if (leftMic)  //turn Right
+  if (leftMicLocal)  //turn Right
   {
     stepperRightTurn();
   }
-  if (rightMic) //turn left
+  if (rightMicLocal) //turn left
   {
     stepperLeftTurn();
   }
@@ -238,8 +238,8 @@ void micReading()
   boolean leftVal = 0;
 
   //read it
-  rightVal = digitalRead(rightSensorPin);
-  leftVal = digitalRead(leftSensorPin);
+  rightVal = digitalRead(micRPin);
+  leftVal = digitalRead(micLPin);
 
   if (rightVal == HIGH && leftVal == LOW) //right
   {
