@@ -201,7 +201,8 @@ void ultraReading()
 }
 
 /*Stepper
- * Turn left or right by 15 degree
+ * Turn left or right by 45 degree
+ * Also have a reset function
  */
 void stepperRightTurn()
 {
@@ -214,6 +215,17 @@ void stepperLeftTurn()
   leftTurn = (-stepsPerRevolution);
   stepper.step(leftTurn);
   delay(500);
+}
+void stepperReset()
+{
+  if (leftMic)  //turn Right
+  {
+    stepperRightTurn();
+  }
+  if (rightMic) //turn left
+  {
+    stepperLeftTurn();
+  }
 }
 
 /*Microphone reader
@@ -234,12 +246,14 @@ void micReading()
     leftMicLocal = false;
     rightMicLocal = true;
     micLocal = 2;
+    stepperRightTurn(); //turn right by 45 degree
   }
   else if (rightVal == LOW && leftVal == HIGH) //left
   {
     leftMicLocal = true;
     rightMicLocal = false;
     micLocal = 1;
+    stepperLeftTurn(); //turn left by 45 degree
   }
   else //same
   {
@@ -248,6 +262,8 @@ void micReading()
     micLocal = 0;
   }
 }
+
+
 
 //------------------------------- Wifi stuff -------------------------------
 /*Wifi
@@ -337,6 +353,12 @@ void printIncomingReadings()
   Serial.println(incomingPacket.microphone_direction);
   Serial.print("Ultrasonic Distance:  ");
   Serial.println(incomingPacket.ultrasonic_distance);
+  Serial.print("Left Mic Reading:  ");
+  Serial.println(incomingPacket.leftMic);
+  Serial.print("Right Mic Reading:  ");
+  Serial.println(incomingPacket.rightMic);
+  Serial.print("Heading:  ");
+  Serial.println(incomingPacket.heading);
   Serial.print("Start Set to:  ");
   Serial.println(incomingPacket.start);
   Serial.print("Manual Set to:  ");
@@ -441,8 +463,20 @@ void displayData()
 }
 
 
-
 void loop() {
-  // put your main code here, to run repeatedly:
+  /*
+  * Start buy running the wifi stuff
+  * Start to run all the sensor reading
+  * Reset the stepper when done
+  */
+  wifiRun();
+  headingReading();
+  ultraReading();
+  micReading();
+  stepperReset();
 
+  //we can cheat on the manual command
+  //have the slave send all data into master
+  //but if manual is on, dont print that data unless
+  //the user asked for it
 }
