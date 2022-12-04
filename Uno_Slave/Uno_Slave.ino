@@ -1,14 +1,17 @@
+#include <Adafruit_LSM303.h>
+#include <Adafruit_LSM303_U.h>
+
+
 //------------ Imports -----------
 /*Will need to inport Adafruit stuff*/
 #include <SoftwareSerial.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_LSM303_Accel.h>
+
+
 #include <SPI.h>
 #include <SD.h>
 #include <Stepper.h>
-#include <AccelStepper.h>
-#include <MultiStepper.h>
 
 //----------- Global Variable ----------
 //Accel heading
@@ -19,8 +22,8 @@ long ultDuration;
 int ultDistance;
 
 //Microphone
-int leftMicRead[20];
-int rightMicRead[20];
+int leftMicRead[10];
+int rightMicRead[10];
 int lMic;
 int rMic;
 int soundLocation = -1; //-1 error, 0 same, 1 left, 2 right
@@ -41,7 +44,7 @@ struct sensor_data {
   bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
   int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
   bool ack = false; //False = Was not Received any response, True = Received Packet
-}
+};
 struct sensor_data packet;
 struct sensor_data incomingPacket;
 
@@ -52,16 +55,16 @@ struct sensor_data incomingPacket;
 SoftwareSerial unoSerial = SoftwareSerial(rxPin, txPin);
 
 //Ultrasonic pins
-#define echoPin 8
-#define trigPin 9
+#define echoPin 5
+#define trigPin 6
 
 //Microphone pins
-#define micLPin A1
-#define micRPin A0
+#define micLPin A0
+#define micRPin A1
 
 
 //Setup Accel Unquique ID
-Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
+Adafruit_LSM303_Mag_Unified accel = Adafruit_LSM303_Mag_Unified(54321);
 
 //stepper setup
 Stepper stepper(stepsPerRevolution, 8, 10, 9, 11);
@@ -70,25 +73,26 @@ int rightTurn = 0;
 int leftTurn = 0;
 
 // Setup func for Accel
-bool accelSetup()
+void accelSetup()
 {
   //Check of the accel is on
   if (!accel.begin())
   {
     Serial.println("Error in Accel");
-    return false;
+    while(1)
+      ;
   }
-  accel.setRange(LSM303_RANGE_4G);
-  accel.setMode(LSM303_MODE_NORMAL);
-  return true;
+  accel.enableAutoRange(true);
+
 }
 
 //Setip func for Ultrasonic
-bool ultraSetup()
+void ultraSetup()
 {
   //Setup pins
   pinMode (trigPin, OUTPUT);
   pinMode (echoPin, INPUT);
+
 }
 
 // Master Setup
@@ -98,15 +102,8 @@ void setup()
   Serial.begin(115200);
 
   //check if something is wrong
-  if (!accelSetup)
-  {
-    Serial.println("E: Accel");
-
-  }
-  if (!ultraSetup())
-  {
-    Serial.println("E: Ultra");
-  }
+  accelSetup();
+  ultraSetup();
 
   //setting stepper speed
   stepper.setSpeed(10);
@@ -115,23 +112,24 @@ void setup()
 
 //----------------------------- Active Func -------------------------------
 
-// /*Accel + Mag Reading
-//  * Z is not needed
-//  */
-// void magReading()
-// {
-//   sensors_event_t event;
-//   accel.getEvent(&event);
-//   magX = event.magnetic.x;
-//   magY = event.magnetic.y;
-// }
-// void accReading()
-// {
-//   sensors_event_t event;
-//   accel.getEvent(&event);
-//   accX = event.acceleration.x;
-//   accY = event.acceleration.y;
-// }
+/*Accel + Mag Reading
+ * Z is not needed
+ */
+void heading()
+{
+  sensors_event_t event;
+  accel.getEvent(&event);
+
+  float Pi = 3.14159;
+
+  // Calculate the angle of the vector y,x
+  accHeading = (atan2(event.magnetic.y, event.magnetic.z) * 180) / Pi;
+
+  // Normalize to 0-360
+  if (accHeading < 0) {
+    accHeading = 360 + accHeading;
+  }
+}
 
 /*Microphone reader
  * This will also calculate the distance from the microphone and how far left/right the sound is
@@ -145,7 +143,7 @@ void micReading()
   int ranalread, lanalread;
 
   //add 100 sample then find the average
-  for(int i = 0; i < 20; i++)
+  for(int i = 0; i < 10; i++)
   {
     //even localer variable
      ranalread = analogRead(micRPin);
@@ -159,27 +157,28 @@ void micReading()
     lRead += lanalread;
     leftMicRead[i] = lanalread;
   }
-  rRead /= 20;
-  lRead /= 20;
+  rRead /= 10;
+  lRead /= 10;
 
   //save
-
+  lMic = lRead;
+  rMic = rRead;
 
   //check which side have the biggest reading
-  if ((rRead < lRead) && (lRead - rRead) > 10) //left side
+  if ((rRead < lRead) && (lRead - rRead) > 2) //left side
   {
     soundLocation = 1;
-    delay(500);
+
   }
-  else if ((rRead > lRead) && (rRead - lRead) > 10) //right side
+  else if ((rRead > lRead) && (rRead - lRead) > 2) //right side
   {
     soundLocation = 2;
-    delay(500);
+
   }
-  else if ((rRead > lRead) && (rRead - lRead) > 10) //same
+  else if ((lRead - rRead) <= 2 || (rRead - lRead) <= 2) //same
   {
     soundLocation = 0;
-    delay(500);
+
   }
 }
 
@@ -262,7 +261,7 @@ void packaging(String data)
     }
     else if(ch == ',')
     {
-      packetArray[count] = temp.toInt();
+      packageArray[count] = temp.toInt();
       count++;
       temp = "";
     }
@@ -273,23 +272,23 @@ void packaging(String data)
   }
 
   //Adding data into array
-  packArray[0] = soundLocation;
-  packArray[1] = ultDistance;
-  packArray[2] = lMic;
-  packArray[3] = rMic;
-  packArray[4] = accHeading;
-  packArray[5] =  false; //start
-  packArray[6] =  0; //manual
-  packArray[7] =  true; //ack
+  packageArray[0] = soundLocation;
+  packageArray[1] = ultDistance;
+  packageArray[2] = lMic;
+  packageArray[3] = rMic;
+  packageArray[4] = accHeading;
+  packageArray[5] =  false; //start
+  packageArray[6] =  0; //manual
+  packageArray[7] =  true; //ack
 
   displayPackageData();
 
   //populate Pocket Data
-  packet.microphone_direction = packArray[0];
-  packet.ultrasonic_distance = packArray[1];
-  packet.start = packArray[2];
-  packet.manual = packArray[3];
-  packet.ack = packArray[4];
+  packet.microphone_direction = packageArray[0];
+  packet.ultrasonic_distance = packageArray[1];
+  packet.start = packageArray[2];
+  packet.manual = packageArray[3];
+  packet.ack = packageArray[4];
 
 }
 
@@ -298,19 +297,19 @@ void packaging(String data)
 void displayPackageData()
 {
   Serial.print("Packet Microhpone = ");
-  Serial.print(packetArray[0]);
+  Serial.print(packageArray[0]);
   Serial.println();
   Serial.print("Packet Ultrasonic = ");
-  Serial.print(packetArray[1]);
+  Serial.print(packageArray[1]);
   Serial.println();
   Serial.print("Packet Start = ");
-  Serial.print(packetArray[2]);
+  Serial.print(packageArray[2]);
   Serial.println();
   Serial.print("Packet Manual = ");
-  Serial.print(packetArray[3]);
+  Serial.print(packageArray[3]);
   Serial.println();
   Serial.print("Packet Ack = ");
-  Serial.print(packetArray[4]);
+  Serial.print(packageArray[4]);
   Serial.println();
 }
 
