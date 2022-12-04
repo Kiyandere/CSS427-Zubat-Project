@@ -1,14 +1,10 @@
-#include <Adafruit_LSM303.h>
-#include <Adafruit_LSM303_U.h>
-
-
 //------------ Imports -----------
 /*Will need to inport Adafruit stuff*/
 #include <SoftwareSerial.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-
-
+#include <Adafruit_LSM303.h>
+#include <Adafruit_LSM303_U.h>
 #include <SPI.h>
 #include <SD.h>
 #include <Stepper.h>
@@ -38,8 +34,8 @@ int packageArray[8];
 struct sensor_data {
   int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
   int8_t ultrasonic_distance = 0; // 0 = ultrasonic_distance Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
-  int16_t leftMic = 0;
-  int16_t rightMic = 0;
+  bool leftMic = false;
+  bool rightMic = false;
   int16_t heading = 0;
   bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
   int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
@@ -95,6 +91,13 @@ void ultraSetup()
 
 }
 
+//Setup for microphone
+void micSetup()
+{
+  pinMode(leftSensorPin, INPUT);
+  pinMode(rightSensorPin, INPUT);
+}
+
 // Master Setup
 void setup() 
 {
@@ -104,6 +107,7 @@ void setup()
   //check if something is wrong
   accelSetup();
   ultraSetup();
+  micSetup();
 
   //setting stepper speed
   stepper.setSpeed(10);
@@ -135,7 +139,7 @@ void heading()
  * This will also calculate the distance from the microphone and how far left/right the sound is
  * 
  */
-void micReading()
+void micReading() //save for later
 {
   //local variable
   int rRead = 0;
