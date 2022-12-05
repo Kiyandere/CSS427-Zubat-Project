@@ -217,6 +217,7 @@ void displayData()
   Serial.println();
   Serial.print("Packet Ack = ");
   Serial.print(packetArray[7]);
+  Serial.println("\n");
   Serial.println();
 }
 
