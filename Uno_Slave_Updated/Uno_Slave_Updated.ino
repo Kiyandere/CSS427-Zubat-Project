@@ -283,11 +283,11 @@ void wifiRun()
   resetPacket();
 
   //getting packet from master
-  if(nodeMCU.available() != 0)
+  if(nodeMCU.available())
   {
 
     readIncomingData();
-
+    Serial.println("Receiving from Master");
     if (newData)
     {
       readManual();
@@ -297,22 +297,22 @@ void wifiRun()
   }
   
   //on demand
-  if (ready)
-  {
-    String sender = "";
-    sender = convertPacketToString();
-    nodeMCU.println(sender);
-    check = true;
-  }
+  // if (ready)
+  // {
+  //   String sender = "";
+  //   sender = convertPacketToString();
+  //   nodeMCU.println(sender);
+  //   check = true;
+  // }
 
-  if(!check)
-  {
-    moveLocalToPacket();
-    String sender = "";
-    sender = convertPacketToString();
-    nodeMCU.println(sender);
-    Serial.println(sender);
-  }
+  // if(!check)
+  // {
+  //   moveLocalToPacket();
+  //   String sender = "";
+  //   sender = convertPacketToString();
+  //   nodeMCU.println(sender);
+  //   Serial.println(sender);
+  // }
 
 
 
@@ -570,21 +570,18 @@ void loop() {
 
 
 
-  Serial.println("Sensor");
-  // headingReading();
-  ultraReading();
-  micReading();
+  // Serial.println("Sensor");
+  // // headingReading();
+  // ultraReading();
+  // micReading();
 
-  Serial.println("reset stepper");
-  stepperReset();
+  // Serial.println("reset stepper");
+  // stepperReset();
 
-  Serial.println("wifi running");
+  // Serial.println("wifi running");
   wifiRun();
 
   delay(7000);
 
-  //we can cheat on the manual command
-  //have the slave send all data into master
-  //but if manual is on, dont print that data unless
-  //the user asked for it
+
 }
