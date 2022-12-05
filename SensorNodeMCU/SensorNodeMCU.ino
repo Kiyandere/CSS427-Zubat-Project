@@ -26,19 +26,21 @@
 
 String incomingData = "";
 String curData = "";
-int packetArray[5];
+int packetArray[8];
 SoftwareSerial nodeMCU(rxPin, txPin);
 bool wait = false;
 bool ready = false;
 bool received = false;
+bool newData = false;
+bool meh = false;
 //From Mega Sensor Side
 uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
 //uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xC0, 0x34};
 struct sensor_data {
   int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
   int8_t ultrasonic_distance = 0; // 0 = Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
-  int16_t leftMic = 0;  // 0 = Never asked or request, anything else is from manual
-  int16_t rightMic = 0; // 0 = Never asked or request, anything else is from manual
+  bool leftMic = 0;  // 0 = Never asked or request, anything else is from manual
+  bool rightMic = 0; // 0 = Never asked or request, anything else is from manual
   int16_t heading = 0; // 0 = Never asked or request, anything else is from manual
   bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
   int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
@@ -81,8 +83,12 @@ void printIncomingReadings()
   Serial.println("INCOMING READINGS");
   Serial.print("Microhpone Direction:  ");
   Serial.println(incomingPacket.microphone_direction);
-  Serial.print("Ultrasonic Distance:  ");
-  Serial.println(incomingPacket.ultrasonic_distance);
+  Serial.print("Left Mircophone:  ");
+  Serial.println(incomingPacket.leftMic);
+  Serial.print("Right Microphone:  ");
+  Serial.println(incomingPacket.rightMic);
+  Serial.print("Compass Heading:  ");
+  Serial.println(incomingPacket.heading);
   Serial.print("Start Set to:  ");
   Serial.println(incomingPacket.start);
   Serial.print("Manual Set to:  ");
@@ -119,29 +125,38 @@ void setup()
 void loop()
 {
   //Check if we are receiving anything from Arduino Central Command
-  if(nodeMCU.available() != 0)
+  if(nodeMCU.available())
   {
     readIncomingData();
-    //Serial.println(wait);
+    Serial.println("We are receiving from Sensor Uno");
   }
 
-  if(ready)
+  if(ready && newData)
   {
     Serial.println("Sending from Sensor");
     esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
     ready = false;
+    newData = false;
   }
 
   if(received)
   {
     printIncomingReadings();
-    cli();
+    
     transferIncomingIntoPacket();
-    sei();
+    
     String sendMessage = convertPacketToString();
+    Serial.println("yo");
     nodeMCU.println(sendMessage);   //Send to the Sensor Platform
     received = false;
+    if(!meh)
+    {
+      Serial.println("Sent back");
+        esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+        meh = true;
+    }
   }
+
 }
 
 String convertPacketToString()
@@ -170,16 +185,21 @@ String convertPacketToString()
 void readIncomingData()
 {
   //Serial.println("We are reading something");
-  char temp = nodeMCU.read();
-  incomingData += String(temp);
-  if(temp == '>')
+  while(nodeMCU.available() > 0)
   {
-    Serial.println(incomingData);
-    String data = incomingData;
-    curData = incomingData;
-    incomingData  = "";
-    convertDataIntoPacket(data);
-    ready = true;
+    char temp = nodeMCU.read();
+    incomingData += String(temp);
+    if(temp == '>')
+    {
+      Serial.println(incomingData);
+      String data = incomingData;
+      curData = incomingData;
+      incomingData  = "";
+      convertDataIntoPacket(data);
+      ready = true;
+      newData = true;
+      break;
+    }
   }
 }
 
@@ -212,7 +232,7 @@ void convertDataIntoPacket(String data)
       temp += ch;
     }
   }
-  //displayData();
+  displayData();
   populatePacketData();
 }
 

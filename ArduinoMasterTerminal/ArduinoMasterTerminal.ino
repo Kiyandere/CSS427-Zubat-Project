@@ -7,7 +7,7 @@
 #include <SoftwareSerial.h>
 
 SerialTransfer dataTransfer;
-SoftwareSerial nodeMCUSerial(2,3);
+SoftwareSerial nodeMCUSerial(10,11);
 int packetArray[8];
 String sender = "";
 String incomingData = "";
@@ -20,8 +20,8 @@ int side = -1;
 struct __attribute__((packed)) sensor_data {
   int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
   int8_t ultrasonic_distance = 0; // 0 = ultrasonic_distance Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
-  int16_t leftMic = 0;  // 0 = Never asked or request, anything else is from manual
-  int16_t rightMic = 0; // 0 = Never asked or request, anything else is from manual
+  bool leftMic = 0;  // 0 = Never asked or request, anything else is from manual
+  bool rightMic = 0; // 0 = Never asked or request, anything else is from manual
   int16_t heading = 0; // 0 = Never asked or request, anything else is from manual
   bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
   int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
@@ -56,6 +56,8 @@ void loop() {
   {
     //Store Data into SD Card and print out incoming data from Node Side
     readIncomingData();
+    //to be fixed later
+    displayData();
   }
   if(Serial.available())
   {
@@ -67,6 +69,7 @@ void loop() {
     packet.microphone_direction = random(0,10);
     packet.ultrasonic_distance = random(0,3);
     sender = convertPacketToString();
+    Serial.println(packet.manual);
     Serial.println(sender);
     nodeMCUSerial.println(sender);
     //sentSize = send_data_to_nodemcu();
@@ -88,6 +91,12 @@ String convertPacketToString()
   converter += ",";
   converter += String(packet.ultrasonic_distance);
   converter += ",";
+  converter += String(packet.leftMic);
+  converter += ",";
+  converter += String(packet.rightMic);
+  converter += ",";
+  converter += String(packet.heading);
+  converter += ",";
   converter += String(packet.start);
   converter += ",";
   converter += String(packet.manual);
@@ -104,41 +113,51 @@ void readCommand(char command)
       ready = true;
       packet.start = true;
       packet.manual = 0;
+      break;
     case '1':
       ready = true;
       packet.start = true;
       packet.manual = 1;
+      break;
     case '2':
       ready = true;
       packet.start = true;
       packet.manual = 2;
+      break;
     case '3':
       ready = true;
       packet.start = true;
       packet.manual = 3;
+      break;
     case '4':
       ready = true;
       packet.start = true;
       packet.manual = 4;
+      break;
     case '5':
       ready = true;
       packet.start = true;
       packet.manual = 5;
+      break;
   }
 }
 
 void readIncomingData()
 {
-  //Serial.println("We are reading something");
-  char temp = nodeMCUSerial.read();
-  incomingData += String(temp);
-  if(temp == '>')
+  Serial.println("We are reading something");
+  while(nodeMCUSerial.available() > 0)
   {
-    Serial.println(incomingData);
-    String data = incomingData;
-    curData = incomingData;
-    incomingData  = "";
-    convertDataIntoPacket(data);
+    char temp = nodeMCUSerial.read();
+    incomingData += String(temp);
+    if(temp == '>')
+    {
+      Serial.println(incomingData);
+      String data = incomingData;
+      curData = incomingData;
+      incomingData  = "";
+      convertDataIntoPacket(data);
+      break;
+    }
   }
 }
 
@@ -171,7 +190,7 @@ void convertDataIntoPacket(String data)
     }
   }
   displayData();
-  populatePacketData();
+  populateIncomingPacketData();
 }
 void displayData()
 {
@@ -201,13 +220,13 @@ void displayData()
   Serial.println();
 }
 
-void populatePacketData()
+void populateIncomingPacketData()
 {
   incomingPacket.microphone_direction = packetArray[0];
   incomingPacket.ultrasonic_distance = packetArray[1];
-  incomingPacket.microphone_direction = packetArray[2];
-  incomingPacket.ultrasonic_distance = packetArray[3];
-  incomingPacket.microphone_direction = packetArray[4];
+  incomingPacket.leftMic = packetArray[2];
+  incomingPacket.rightMic = packetArray[3];
+  incomingPacket.heading = packetArray[4];
   incomingPacket.start = packetArray[5];
   incomingPacket.manual = packetArray[6];
   incomingPacket.ack = packetArray[7];

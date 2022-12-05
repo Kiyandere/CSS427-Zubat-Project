@@ -1,4 +1,3 @@
-//Test of Arduino to NodeMCU  - Node Perspective, Master Side = 50:02:91:DC:CF:83
 #include <ArduinoWiFiServer.h>
 #include <BearSSLHelpers.h>
 #include <CertStoreBearSSL.h>
@@ -17,7 +16,8 @@
 #include <WiFiServerSecure.h>
 #include <WiFiServerSecureBearSSL.h>
 #include <WiFiUdp.h>
-//#include <WiFi.h>
+//Test of Arduino to NodeMCU  - Node Perspective, Master Side = 50:02:91:DC:CF:83
+
 #include <espnow.h>
 #include <SoftwareSerial.h>
 
@@ -31,14 +31,15 @@ SoftwareSerial nodeMCU(rxPin, txPin);
 bool wait = false;
 bool ready = false;
 bool received = false;
+bool newData = false;
 //Uno NodeMCU Broadcast MAC Address that we are sending, UDP
 //uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
 uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xC0, 0x34};
 struct sensor_data {
   int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
   int8_t ultrasonic_distance = 0; // 0 = Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
-  int16_t leftMic = 0;  // 0 = Never asked or request, anything else is from manual
-  int16_t rightMic = 0; // 0 = Never asked or request, anything else is from manual
+  bool leftMic = 0;  // 0 = Never asked or request, anything else is from manual
+  bool rightMic = 0; // 0 = Never asked or request, anything else is from manual
   int16_t heading = 0; // 0 = Never asked or request, anything else is from manual
   bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
   int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
@@ -119,25 +120,29 @@ void setup()
 void loop()
 {
   //Check if we are receiving anything from Arduino Central Command
-  if(nodeMCU.available() != 0)
+  if(nodeMCU.available())
   {
     readIncomingData();
-    //Serial.println(wait);
+    Serial.println("receiving from Uno");
   }
 
-  if(ready)
+  if(ready && newData)
   {
     Serial.println("Sending from master");
-    esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+    Serial.print("The size of packet is:  ");
+    Serial.println(sizeof(packet));
+    int bytes = esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+    Serial.print("Bytes Sent:  ");
+    Serial.println(bytes);
     ready = false;
   }
 
   if(received)
   {
     printIncomingReadings();
-    cli();
+   
     transferIncomingIntoPacket();
-    sei();
+    
     String sendMessage = convertPacketToString();
     nodeMCU.println(sendMessage);
     received = false;
@@ -170,17 +175,23 @@ String convertPacketToString()
 void readIncomingData()
 {
   //Serial.println("We are reading something");
-  char temp = nodeMCU.read();
-  incomingData += String(temp);
-  if(temp == '>')
+  while(nodeMCU.available() > 0)
   {
-    Serial.println(incomingData);
-    String data = incomingData;
-    curData = incomingData;
-    incomingData  = "";
-    convertDataIntoPacket(data);
-    ready = true;
+    char temp = nodeMCU.read();
+    incomingData += String(temp);
+    if(temp == '>')
+    {
+      Serial.println(incomingData);
+      String data = incomingData;
+      curData = incomingData;
+      incomingData  = "";
+      convertDataIntoPacket(data);
+      ready = true;
+      newData = true;
+      break;
+    }
   }
+
 }
 
 void convertDataIntoPacket(String data)
@@ -211,7 +222,7 @@ void convertDataIntoPacket(String data)
       temp += ch;
     }
   }
-  //displayData();
+  displayData();
   populatePacketData();
 }
 
@@ -246,9 +257,9 @@ void populatePacketData()
 {
   packet.microphone_direction = packetArray[0];
   packet.ultrasonic_distance = packetArray[1];
-  packet.microphone_direction = packetArray[2];
-  packet.ultrasonic_distance = packetArray[3];
-  packet.microphone_direction = packetArray[4];
+  packet.leftMic = packetArray[2];
+  packet.rightMic = packetArray[3];
+  packet.heading = packetArray[4];
   packet.start = packetArray[5];
   packet.manual = packetArray[6];
   packet.ack = packetArray[7];
