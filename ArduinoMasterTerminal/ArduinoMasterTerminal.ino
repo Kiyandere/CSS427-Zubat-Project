@@ -35,6 +35,7 @@ struct __attribute__((packed)) sensor_data {
 
 struct sensor_data packet;
 struct sensor_data incomingPacket;
+struct sensor_data basePacket;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -47,25 +48,25 @@ void setup() {
   //delay(2000);
 }
 
-String convertPacketToString()
+String convertBasePacketToString()
 {
   String converter = "";
   converter += "<";
-  converter += String(packet.microphone_direction);
+  converter += String(basePacket.microphone_direction);
   converter += ",";
-  converter += String(packet.ultrasonic_distance);
+  converter += String(basePacket.ultrasonic_distance);
   converter += ",";
-  converter += String(packet.leftMic);
+  converter += String(basePacket.leftMic);
   converter += ",";
-  converter += String(packet.rightMic);
+  converter += String(basePacket.rightMic);
   converter += ",";
-  converter += String(packet.heading);
+  converter += String(basePacket.heading);
   converter += ",";
-  converter += String(packet.start);
+  converter += String(basePacket.start);
   converter += ",";
-  converter += String(packet.manual);
+  converter += String(basePacket.manual);
   converter += ",";
-  converter += String(packet.ack);
+  converter += String(basePacket.ack);
   converter += ">";
   return converter;
 }
@@ -75,33 +76,33 @@ void readCommand(char command)
   switch(command){
     case '0':
       ready = true;
-      packet.start = true;
-      packet.manual = 0;
+      basePacket.start = true;
+      basePacket.manual = 0;
       break;
     case '1':
       ready = true;
-      packet.start = true;
-      packet.manual = 1;
+      basePacket.start = true;
+      basePacket.manual = 1;
       break;
     case '2':
       ready = true;
-      packet.start = true;
-      packet.manual = 2;
+      basePacket.start = true;
+      basePacket.manual = 2;
       break;
     case '3':
       ready = true;
-      packet.start = true;
-      packet.manual = 3;
+      basePacket.start = true;
+      basePacket.manual = 3;
       break;
     case '4':
       ready = true;
-      packet.start = true;
-      packet.manual = 4;
+      basePacket.start = true;
+      basePacket.manual = 4;
       break;
     case '5':
       ready = true;
-      packet.start = true;
-      packet.manual = 5;
+      basePacket.start = true;
+      basePacket.manual = 5;
       break;
   }
 }
@@ -162,9 +163,10 @@ void loop() {
   if(newData == true)
   {
     convertDataIntoPacket(dataIn);
-    displayData();
+    //displayData();
     newData = false;
-    //nodeMCUSerial.write(incomingData.c_str());
+    Serial.println("Incoming Data:");
+    Serial.println(dataIn);
     c = 0;
     dataIn = "";
   }
@@ -178,7 +180,7 @@ void checkCommand()
   {
     char temp = Serial.read();
     readCommand(temp);
-    sender = convertPacketToString();
+    sender = convertBasePacketToString();
     break;
   }
   if(ready)
