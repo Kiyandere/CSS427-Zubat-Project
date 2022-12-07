@@ -6,13 +6,18 @@
 #include <SerialTransfer.h>
 #include <SoftwareSerial.h>
 
-SerialTransfer dataTransfer;
-SoftwareSerial nodeMCUSerial(10,11);
+SoftwareSerial Arduino_SoftSerial(10,11);
 int packetArray[8];
+
+char c;
+String dataIn;
 String sender = "";
 String incomingData = "";
 String curData = "";
+bool newData = false;
 bool ready = false;
+volatile bool sending = false;
+volatile bool receiving = false;
 bool sensorReady = false;
 int compassX = -1;
 int compassY = -1;
@@ -27,61 +32,20 @@ struct __attribute__((packed)) sensor_data {
   int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
   bool ack = false; //False = Was not Received any response, True = Received Packet
 };
+
 struct sensor_data packet;
 struct sensor_data incomingPacket;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  nodeMCUSerial.begin(115200);
+  Arduino_SoftSerial.begin(57600);
+  // attachInterrupt(6, masterCommand, RISING);
+  // attachInterrupt(5, receiveData, FALLING);
   //dataTransfer.begin(nodeMCUSerial);
   //packet.microphone_direction = random(0, 3);
   //packet.ultrasonic_distance = random(0,3);
   //delay(2000);
 }
-
-
-void loop() {
-  // put your main code here, to run repeatedly:
-  //uint16_t sentSize = 0;
-  // if(Serial.available() > 0)
-  // {
-  //   int input = Serial.parseInt();
-  //   Serial.println("Sending....");
-  //   if(input == 1)
-  //   {
-  //     ready = true;
-  //   }
-  // }
-  if(nodeMCUSerial.available())
-  {
-    //Store Data into SD Card and print out incoming data from Node Side
-    readIncomingData();
-    //to be fixed later
-    displayData();
-  }
-  if(Serial.available())
-  {
-    char temp = Serial.read();
-    readCommand(temp);
-  }
-  if(ready)
-  {
-    packet.microphone_direction = random(0,10);
-    packet.ultrasonic_distance = random(0,3);
-    sender = convertPacketToString();
-    Serial.println(packet.manual);
-    Serial.println(sender);
-    nodeMCUSerial.println(sender);
-    //sentSize = send_data_to_nodemcu();
-    ready = false;
-    // Serial.print("Bytes Sent to NodeMCU:  ");
-    // Serial.print(sentSize);
-    // Serial.println();
-    // Serial.println(packet.microphone_direction);
-  }
-  //When ready to be sent, place packet here
-}
-
 
 String convertPacketToString()
 {
@@ -142,56 +106,7 @@ void readCommand(char command)
   }
 }
 
-void readIncomingData()
-{
-  Serial.println("We are reading something");
-  while(nodeMCUSerial.available() > 0)
-  {
-    char temp = nodeMCUSerial.read();
-    incomingData += String(temp);
-    if(temp == '>')
-    {
-      Serial.println(incomingData);
-      String data = incomingData;
-      curData = incomingData;
-      incomingData  = "";
-      convertDataIntoPacket(data);
-      break;
-    }
-  }
-}
 
-void convertDataIntoPacket(String data)
-{
-  String temp = "";
-  int count = 0;
-  
-  for(int i = 0; i < data.length(); i++)
-  {
-    char ch = data.charAt(i);
-    if(ch == '<' || ch == '>')
-    {
-      continue;
-    }
-    else if(ch == ',')
-    {
-      packetArray[count] = temp.toInt();
-      count++;
-      if(count >= sizeof(packetArray))
-      {
-        Serial.println("Error in packet size or conversion");
-        break;
-      }
-      temp = "";
-    }
-    else
-    {
-      temp += ch;
-    }
-  }
-  displayData();
-  populateIncomingPacketData();
-}
 void displayData()
 {
   Serial.print("Packet Microhpone = ");
@@ -217,7 +132,6 @@ void displayData()
   Serial.println();
   Serial.print("Packet Ack = ");
   Serial.print(packetArray[7]);
-  Serial.println("\n");
   Serial.println();
 }
 
@@ -233,4 +147,99 @@ void populateIncomingPacketData()
   incomingPacket.ack = packetArray[7];
 }
 
+void loop() {
+  // put your main code here, to run repeatedly:
+  checkCommand();
+  // if(ready && !newData)
+  // {
+  //   sender = convertPacketToString();
+  //   //Serial.println(packet.manual);
+  //   Arduino_SoftSerial.println(sender);
+  //   //sentSize = send_data_to_nodemcu();
+  //   ready = false;
+  // }
+  ReadIncoming();
+  if(newData == true)
+  {
+    convertDataIntoPacket(dataIn);
+    displayData();
+    newData = false;
+    //nodeMCUSerial.write(incomingData.c_str());
+    c = 0;
+    dataIn = "";
+  }
+  
+  //When ready to be sent, place packet here
+}
 
+void checkCommand()
+{
+  while(Serial.available() > 0)
+  {
+    char temp = Serial.read();
+    readCommand(temp);
+    sender = convertPacketToString();
+    break;
+  }
+  if(ready)
+  {
+    Arduino_SoftSerial.print(sender);
+    ready = false;
+  }
+}
+void ReadIncoming()
+{
+  while(Arduino_SoftSerial.available() > 0  && newData == false)
+  {
+    c = Arduino_SoftSerial.read();
+    if(c=='>')
+    {
+      dataIn += c;
+      newData = true;
+      //Serial.print("We are here \n");
+      break;
+    }
+    else
+    {
+      dataIn += c;
+    }
+  }
+}
+
+void convertDataIntoPacket(String data)
+{
+  String temp = "";
+  int count = 0;
+  
+  for(int i = 0; i < data.length(); i++)
+  {
+    char ch = data.charAt(i);
+    if(ch == '<')
+    {
+      continue;
+    }
+    else if(ch == '>')
+    {
+      //Serial.println(temp);
+      packetArray[count] = temp.toInt();
+      count++;
+      temp = "";
+    }
+    else if(ch == ',')
+    {
+      //Serial.println(temp);
+      packetArray[count] = temp.toInt();
+      count++;
+      if(count >= sizeof(packetArray))
+      {
+        Serial.println("Error in packet size or conversion");
+        break;
+      }
+      temp = "";
+    }
+    else
+    {
+      temp += ch;
+    }
+  }
+}
