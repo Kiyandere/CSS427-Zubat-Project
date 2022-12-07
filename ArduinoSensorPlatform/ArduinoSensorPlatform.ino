@@ -8,7 +8,7 @@
 
 SerialTransfer dataTransfer;
 SoftwareSerial nodeMCUSerial(2,3);
-int converterArray[5];
+int converterArray[8];
 String sender = "";
 bool ready = false;
 bool sensorReady = false;
@@ -16,10 +16,13 @@ int compassX = -1;
 int compassY = -1;
 int side = -1;
 struct __attribute__((packed)) sensor_data {
-  int8_t microphone_direction = 3; //0 = middle, 1 = left, 2 = right, 3 = error
-  uint16_t ultrasonic_distance = 0; // 0 = Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
+  int8_t microphone_direction = -1; //0 = middle, 1 = left, 2 = right, -1 = error
+  int8_t ultrasonic_distance = 0; // 0 = ultrasonic_distance Device Disabled/Error, 1 = Close to Sensor, 2 = Far from Sensor
+  int16_t leftMic = 0;  // 0 = Never asked or request, anything else is from manual
+  int16_t rightMic = 0; // 0 = Never asked or request, anything else is from manual
+  int16_t heading = 0; // 0 = Never asked or request, anything else is from manual
   bool start = false; //False = Not Sent/Awaiting, True = Begin Transmission/Sent
-  bool manual = false; //False = Automatic, True = Manual Control
+  int8_t manual = 0; //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
   bool ack = false; //False = Was not Received any response, True = Received Packet
 };
 struct sensor_data packet;

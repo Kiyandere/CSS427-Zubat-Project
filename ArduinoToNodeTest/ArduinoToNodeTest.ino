@@ -21,17 +21,22 @@
 #include <espnow.h>
 #include <SoftwareSerial.h>
 
-#define rxPin 12 //D6
-#define txPin 13 //D7
+#define rxPin D1 //D6
+#define txPin D2 //D7
 
 String incomingData = "";
 String curData = "";
+char c;
+String dataIn;
 int packetArray[8];
-SoftwareSerial nodeMCU(rxPin, txPin);
+SoftwareSerial NodeMcu_SoftSerial(rxPin, txPin);
 bool wait = false;
 bool ready = false;
 bool received = false;
 bool newData = false;
+bool sendData = false;
+long interval = 3000;   //Adjust this as Sensor has its own timer
+long prevMillis = 0;
 //Uno NodeMCU Broadcast MAC Address that we are sending, UDP
 //uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
 uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xC0, 0x34};
@@ -51,6 +56,7 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.print("Last Packet Send Status: ");
   if (sendStatus == 0){
     Serial.println("Delivery success");
+    sendData = false;
   }
   else{
     Serial.println("Delivery fail");
@@ -59,10 +65,13 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
 }
 
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
-  memcpy(&incomingPacket, incomingData, sizeof(incomingPacket));
-  Serial.print("Bytes received: ");
-  Serial.println(len);
-  received = true;
+  if(!received)
+  {
+    memcpy(&incomingPacket, incomingData, sizeof(incomingPacket));
+    Serial.print("Bytes received: ");
+    Serial.println(len);
+    received = true;    
+  }
 }
 
 void transferIncomingIntoPacket()
@@ -94,7 +103,7 @@ void printIncomingReadings()
 void setup()
 {
   Serial.begin(115200);
-  nodeMCU.begin(115200);
+  NodeMcu_SoftSerial.begin(57600);
   //dataTransfer.begin(nodeMCU);
   Serial.print("ESP Uno MAC Board Address is:  ");
   Serial.println(WiFi.macAddress());
@@ -120,32 +129,67 @@ void setup()
 void loop()
 {
   //Check if we are receiving anything from Arduino Central Command
-  if(nodeMCU.available())
+  ReadIncoming();
+  if(newData)
   {
-    readIncomingData();
-    Serial.println("receiving from Uno");
+    //Serial.println("receiving from Uno");
+    //Serial.println(dataIn);
+    convertDataIntoPacket(dataIn);
+    populatePacketData();
+    //displayData();
+    //int bytes = esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+    ready = true;
+    newData = false;
   }
-
-  if(ready && newData)
+  if((millis() - prevMillis > interval))
   {
-    Serial.println("Sending from master");
-    Serial.print("The size of packet is:  ");
-    Serial.println(sizeof(packet));
-    int bytes = esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
-    Serial.print("Bytes Sent:  ");
-    Serial.println(bytes);
+    prevMillis = millis();
+    sendData = true;
+  }
+  if(ready && !newData)
+  {
+    Serial.println("We Sent the data to Sensor");    
+    esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+    //String sendMessage = convertPacketToString();
+    //Serial.println(sendMessage);
+    //NodeMcu_SoftSerial.println(sendMessage);    
     ready = false;
+    sendData = false;
+    dataIn = "";
+    c = 0;
   }
 
-  if(received)
+
+  if(received && !ready && !newData && sendData)
   {
-    printIncomingReadings();
+    //printIncomingReadings();
    
-    transferIncomingIntoPacket();
-    
+    //transferIncomingIntoPacket();
+    //NodeMcu_SoftSerial.println("<3,5,0,1,3,2,0,3>");
     String sendMessage = convertPacketToString();
-    nodeMCU.println(sendMessage);
+    //Serial.println(sendMessage);
+    NodeMcu_SoftSerial.println(sendMessage);
     received = false;
+    sendData = false;
+  }
+}
+
+void ReadIncoming()
+{
+  while(NodeMcu_SoftSerial.available() > 0  && newData == false)
+  {
+    c = NodeMcu_SoftSerial.read();
+    if(c=='>')
+    {
+      dataIn += c;
+      newData = true;
+      //Serial.print("We are here \n");
+      break;
+    }
+    else
+    {
+      dataIn += c;
+    }
   }
 }
 
@@ -172,27 +216,6 @@ String convertPacketToString()
   return converter;
 }
 
-void readIncomingData()
-{
-  //Serial.println("We are reading something");
-  while(nodeMCU.available() > 0)
-  {
-    char temp = nodeMCU.read();
-    incomingData += String(temp);
-    if(temp == '>')
-    {
-      Serial.println(incomingData);
-      String data = incomingData;
-      curData = incomingData;
-      incomingData  = "";
-      convertDataIntoPacket(data);
-      ready = true;
-      newData = true;
-      break;
-    }
-  }
-
-}
 
 void convertDataIntoPacket(String data)
 {
@@ -202,12 +225,20 @@ void convertDataIntoPacket(String data)
   for(int i = 0; i < data.length(); i++)
   {
     char ch = data.charAt(i);
-    if(ch == '<' || ch == '>')
+    if(ch == '<')
     {
       continue;
     }
+    else if(ch == '>')
+    {
+      //Serial.println(temp);
+      packetArray[count] = temp.toInt();
+      count++;
+      temp = "";
+    }
     else if(ch == ',')
     {
+      //Serial.println(temp);
       packetArray[count] = temp.toInt();
       count++;
       if(count >= sizeof(packetArray))
@@ -222,8 +253,6 @@ void convertDataIntoPacket(String data)
       temp += ch;
     }
   }
-  displayData();
-  populatePacketData();
 }
 
 void displayData()
@@ -264,3 +293,24 @@ void populatePacketData()
   packet.manual = packetArray[6];
   packet.ack = packetArray[7];
 }
+
+// void readIncomingData()
+// {
+//   //Serial.println("We are reading something");
+//   while(nodeMCU.available() > 0)
+//   {
+//     char temp = nodeMCU.read();
+//     incomingData += String(temp);
+//     if(temp == '>')
+//     {
+//       Serial.println(incomingData);
+//       String data = incomingData;
+//       curData = incomingData;
+//       incomingData  = "";
+//       convertDataIntoPacket(data);
+//       ready = true;
+//       newData = true;
+//       break;
+//     }
+//   }
+// }

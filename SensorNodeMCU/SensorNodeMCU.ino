@@ -21,18 +21,22 @@
 #include <espnow.h>
 #include <SoftwareSerial.h>
 
-#define rxPin 12 //D6
-#define txPin 13 //D7
+#define rxPin D1 //D1
+#define txPin D2 //D2
 
 String incomingData = "";
 String curData = "";
 int packetArray[8];
-SoftwareSerial nodeMCU(rxPin, txPin);
+SoftwareSerial NodeMcu_SoftSerial(rxPin, txPin);
 bool wait = false;
 bool ready = false;
 bool received = false;
 bool newData = false;
-bool meh = false;
+bool sendData = false;
+String dataIn = "";
+char c;
+long interval = 2000; //Adjust this for nodeMCU as Sensor will have its own timer
+long prevMillis = 0;
 //From Mega Sensor Side
 uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
 //uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xC0, 0x34};
@@ -52,6 +56,7 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.print("Last Packet Send Status: ");
   if (sendStatus == 0){
     Serial.println("Delivery success");
+    sendData = false;
   }
   else{
     Serial.println("Delivery fail");
@@ -83,6 +88,8 @@ void printIncomingReadings()
   Serial.println("INCOMING READINGS");
   Serial.print("Microhpone Direction:  ");
   Serial.println(incomingPacket.microphone_direction);
+  Serial.print("Ultrasonic Direction:  ");
+  Serial.println(incomingPacket.ultrasonic_distance);
   Serial.print("Left Mircophone:  ");
   Serial.println(incomingPacket.leftMic);
   Serial.print("Right Microphone:  ");
@@ -99,7 +106,7 @@ void printIncomingReadings()
 void setup()
 {
   Serial.begin(115200);
-  nodeMCU.begin(115200);
+  NodeMcu_SoftSerial.begin(57600);
   //dataTransfer.begin(nodeMCU);
   Serial.print("ESP Uno MAC Board Address is:  ");
   Serial.println(WiFi.macAddress());
@@ -120,43 +127,75 @@ void setup()
   
   // Register for a callback function that will be called when data is received
   esp_now_register_recv_cb(OnDataRecv);
+  // attachInterrupt(D5, receiveData, FALLING);
+  // attachInterrupt(D6, masterCommand, RISING);
 }
 
 void loop()
 {
   //Check if we are receiving anything from Arduino Central Command
-  if(nodeMCU.available())
+  ReadIncoming();
+  if(newData)
   {
-    readIncomingData();
-    Serial.println("We are receiving from Sensor Uno");
-  }
-
-  if(ready && newData)
-  {
-    Serial.println("Sending from Sensor");
-    esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
-    ready = false;
+    //Serial.println("receiving from Uno");
+    //Serial.println(dataIn);
+    convertDataIntoPacket(dataIn);
+    populatePacketData();
+    //displayData();
+    //int bytes = esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+    ready = true;
     newData = false;
   }
-
-  if(received)
+  if((millis() - prevMillis > interval))  //We may not need this as Sensor will have its own
   {
-    printIncomingReadings();
-    
-    transferIncomingIntoPacket();
-    
-    String sendMessage = convertPacketToString();
-    Serial.println("yo");
-    nodeMCU.println(sendMessage);   //Send to the Sensor Platform
-    received = false;
-    if(!meh)
-    {
-      Serial.println("Sent back");
-        esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
-        meh = true;
-    }
+    prevMillis = millis();
+    sendData = true;      //may not be needed
+  }
+  if(ready && !newData && sendData)   //SendData may not be needed
+  {
+    Serial.println("We Sent the data to Master");    
+    esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+    //String sendMessage = convertPacketToString();
+    //Serial.println(sendMessage);
+    //NodeMcu_SoftSerial.println(sendMessage);    
+    ready = false;
+    sendData = false;
+    dataIn = "";
+    c = 0;
   }
 
+
+  if(received && !newData && !sendData)
+  {
+    //printIncomingReadings();
+   
+    transferIncomingIntoPacket();
+    //NodeMcu_SoftSerial.println("<3,5,0,1,3,2,0,3>");
+    String sendMessage = convertPacketToString();
+    //Serial.println(sendMessage);
+    NodeMcu_SoftSerial.println(sendMessage);
+    received = false;
+    sendData = false;
+  }
+}
+
+void ReadIncoming()
+{
+  while(NodeMcu_SoftSerial.available() > 0  && newData == false)
+  {
+    c = NodeMcu_SoftSerial.read();
+    if(c=='>')
+    {
+      dataIn += c;
+      newData = true;
+      //Serial.print("We are here \n");
+      break;
+    }
+    else
+    {
+      dataIn += c;
+    }
+  }
 }
 
 String convertPacketToString()
@@ -182,26 +221,34 @@ String convertPacketToString()
   return converter;
 }
 
-void readIncomingData()
-{
-  //Serial.println("We are reading something");
-  while(nodeMCU.available() > 0)
-  {
-    char temp = nodeMCU.read();
-    incomingData += String(temp);
-    if(temp == '>')
-    {
-      Serial.println(incomingData);
-      String data = incomingData;
-      curData = incomingData;
-      incomingData  = "";
-      convertDataIntoPacket(data);
-      ready = true;
-      newData = true;
-      break;
-    }
-  }
-}
+// void readIncomingData() {
+//   bool recvInProgress = false;
+//   //Serial.println("We are reading something");
+//   while(nodeMCU.available() > 0 && newData == false)
+//   {
+//     char temp = nodeMCU.read();
+//     if(recvInProgress == true)
+//     {
+//       if(temp != '>')
+//       {
+//         incomingData += String(temp);
+//       }
+//       else if(temp == '>')
+//       {
+//         incomingData += String(temp);
+//         //Serial.println(incomingData);
+//         newData = true;
+//         recvInProgress = false;
+//       }
+//     }
+//     else if(temp == '<')
+//     {
+//       recvInProgress = true;
+//       incomingData += String(temp);
+//     }
+
+//   }
+// }
 
 
 void convertDataIntoPacket(String data)
@@ -232,8 +279,6 @@ void convertDataIntoPacket(String data)
       temp += ch;
     }
   }
-  displayData();
-  populatePacketData();
 }
 
 void displayData()
@@ -267,9 +312,9 @@ void populatePacketData()
 {
   packet.microphone_direction = packetArray[0];
   packet.ultrasonic_distance = packetArray[1];
-  packet.microphone_direction = packetArray[2];
-  packet.ultrasonic_distance = packetArray[3];
-  packet.microphone_direction = packetArray[4];
+  packet.leftMic = packetArray[2];
+  packet.rightMic = packetArray[3];
+  packet.heading = packetArray[4];
   packet.start = packetArray[5];
   packet.manual = packetArray[6];
   packet.ack = packetArray[7];
