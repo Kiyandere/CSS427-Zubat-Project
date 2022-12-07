@@ -1,39 +1,16 @@
-// #include <ArduinoWiFiServer.h>
-// #include <BearSSLHelpers.h>
-// #include <CertStoreBearSSL.h>
-// #include <ESP8266WiFi.h>
-// #include <ESP8266WiFiAP.h>
-// #include <ESP8266WiFiGeneric.h>
-// #include <ESP8266WiFiGratuitous.h>
-// #include <ESP8266WiFiMulti.h>
-// #include <ESP8266WiFiSTA.h>
-// #include <ESP8266WiFiScan.h>
-// #include <ESP8266WiFiType.h>
-// #include <WiFiClient.h>
-// #include <WiFiClientSecure.h>
-// #include <WiFiClientSecureBearSSL.h>
-// #include <WiFiServer.h>
-// #include <WiFiServerSecure.h>
-// #include <WiFiServerSecureBearSSL.h>
-// #include <WiFiUdp.h>
-
 //------------------------------- Imports -------------------------------
 /*Will need to inport Adafruit stuff*/
 #include <SoftwareSerial.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-//#include <Adafruit_LSM303.h>
-#include <Adafruit_LSM303_Accel.h>
+#include <Adafruit_LSM303.h>
+#include <Adafruit_LSM303_U.h>
 #include <SPI.h>
-#include <SD.h>
 #include <Stepper.h>
 
-
-//#include <WiFi.h>
-// #include <espnow.h>
 #include <SoftwareSerial.h>
-#define rxPin 10 //Pin to connect to D6
-#define txPin 11 //Pin to connect to D7
+#define rxPin 10 //Pin to connect to D2
+#define txPin 11 //Pin to connect to D1
 //------------------------------- Wifi stuff -------------------------------
 //struct for packet
 struct sensor_data {
@@ -65,13 +42,9 @@ bool received = false;
 //Setup softwareSerial
 SoftwareSerial nodeMCU(rxPin, txPin);
 
-//MAC address: 
-//uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
-uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xC0, 0x34};
-
 //------------------------------- Global Variable -------------------------------
 //stepper
-const int stepsPerRevolution = 512;  // change this to fit the number of steps per revolution
+const int stepsPerRevolution = 400;  // change this to fit the number of steps per revolution
 
 //local data
 int micLocal = -1;
@@ -82,7 +55,6 @@ int headingLocal = 0;
 bool start = false;
 int manual = 0;
 bool ack = false;
-
 
 bool newData = false;
 
@@ -96,29 +68,32 @@ bool newData = false;
 #define micRPin 12
 
 //Stepper pins
-#define in1 3
-#define in2 2
-#define in3 1
-#define in4 0
+#define in1 A0
+#define in2 A1
+#define in3 A2
+#define in4 A3
 
 //------------------------------- Setup -------------------------------
 //Setup Accel Unquique ID
-Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
+Adafruit_LSM303_Mag_Unified accel = Adafruit_LSM303_Mag_Unified(54321);
 
 //Set up the Stepper motor variable
-Stepper stepper(stepsPerRevolution, in1, in2, in3, in4);
+Stepper stepper(stepsPerRevolution, in1, in3, in2, in4);
 void setup() {
   //setup serial first
   Serial.begin(115200);
   nodeMCU.begin(115200);
 
-    //Ultrasonic for distance
+  //Ultrasonic for distance
   pinMode (trigPin, OUTPUT);
   pinMode (echoPin, INPUT);
 
   //Mic setup
   pinMode(micLPin, INPUT);
   pinMode(micRPin, INPUT);
+
+  //setting stepper speed
+  stepper.setSpeed(25);
 
   //Accel for heading
   if (!accel.begin())
@@ -127,36 +102,9 @@ void setup() {
     while(1)
       ;
   }
-  accel.setRange(LSM303_RANGE_4G);
-  accel.setMode(LSM303_MODE_NORMAL);
+  accel.enableAutoRange(true);
 
 
-
-  //setting stepper speed
-  stepper.setSpeed(20);
-
-  //wifi setup
-  // Serial.print("ESP Uno MAC Board Address is:  ");
-  // Serial.println(WiFi.macAddress());
-  // WiFi.mode(WIFI_STA);
-  // WiFi.disconnect();
-
-  // if (esp_now_init() != 0)
-  // {
-  //   Serial.println("Error in Initializing ESP-NOW");
-  // }
-
-  // // Set ESP-NOW Role
-  // esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
-
-  // // Once ESPNow is successfully Init, we will register for Send CB to
-  // // get the status of Trasnmitted packet
-  // esp_now_register_send_cb(OnDataSent);
-  // // Register peer
-  // esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
-  
-  // // Register for a callback function that will be called when data is received
-  // esp_now_register_recv_cb(OnDataRecv);
 }
 
 //------------------------------- Active Func -------------------------------
@@ -244,6 +192,10 @@ void micReading()
   boolean rightVal = 0;
   boolean leftVal = 0;
 
+  //resetMic
+  leftMicLocal = false;
+  rightMicLocal = false;
+
   //read it
   rightVal = digitalRead(micRPin);
   leftVal = digitalRead(micLPin);
@@ -264,8 +216,8 @@ void micReading()
   }
   else //same
   {
-    leftMicLocal = true;
-    rightMicLocal = true;
+    leftMicLocal = false;
+    rightMicLocal = false; 
     micLocal = 0;
   }
 }
@@ -313,11 +265,6 @@ void wifiRun()
   //   nodeMCU.println(sender);
   //   Serial.println(sender);
   // }
-
-
-
-
-
 
   //sending to master?
   // if(ready)
@@ -560,28 +507,17 @@ void readManual()
   }
 }
 
-
 void loop() {
-  /*
-  * Start buy running the wifi stuff
-  * Start to run all the sensor reading
-  * Reset the stepper when done
-  */
 
-
-
-  // Serial.println("Sensor");
-  // // headingReading();
-  // ultraReading();
-  // micReading();
-
-  // Serial.println("reset stepper");
-  // stepperReset();
-
-  // Serial.println("wifi running");
-  wifiRun();
-
-  delay(7000);
-
+    micReading();
+    Serial.print("location:");
+    Serial.println(micLocal);
+    Serial.print("Left mic:");
+    Serial.println(leftMicLocal);
+    Serial.print("Right mic:");
+    Serial.println(rightMicLocal);
+    stepperReset();
+    Serial.println();
+    delay(3000);
 
 }
