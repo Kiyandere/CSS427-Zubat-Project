@@ -138,14 +138,14 @@ void displayData()
 
 void populateIncomingPacketData()
 {
-  incomingPacket.microphone_direction = packetArray[0];
-  incomingPacket.ultrasonic_distance = packetArray[1];
-  incomingPacket.leftMic = packetArray[2];
-  incomingPacket.rightMic = packetArray[3];
-  incomingPacket.heading = packetArray[4];
-  incomingPacket.start = packetArray[5];
-  incomingPacket.manual = packetArray[6];
-  incomingPacket.ack = packetArray[7];
+  packet.microphone_direction = packetArray[0];
+  packet.ultrasonic_distance = packetArray[1];
+  packet.leftMic = packetArray[2];
+  packet.rightMic = packetArray[3];
+  packet.heading = packetArray[4];
+  packet.start = packetArray[5];
+  packet.manual = packetArray[6];
+  packet.ack = packetArray[7];
 }
 
 void loop() {
@@ -164,9 +164,14 @@ void loop() {
   {
     convertDataIntoPacket(dataIn);
     //displayData();
-    newData = false;
-    //Serial.println("Incoming Data:");
+    Serial.print("--------------");
     Serial.println(dataIn);
+    populateIncomingPacketData();
+    displayDataToHuman();
+    newData = false;
+    Serial.println("--------------");
+    //Serial.println("Incoming Data:");
+    
     c = 0;
     dataIn = "";
   }
@@ -186,6 +191,7 @@ void checkCommand()
   }
   if(ready)
   {
+    Serial.println("Sent");
     Arduino_SoftSerial.print(sender);
     ready = false;
   }
@@ -208,7 +214,45 @@ void ReadIncoming()
     }
   }
 }
+void displayDataToHuman()
+{
+  int manual = packet.manual;
 
+  switch(manual)
+  {
+    case 1:
+      Serial.print("MD = ");
+      Serial.println(packet.microphone_direction);
+      Serial.println("Ack");
+      break;
+    case 2:
+      Serial.print("LMic = ");
+      Serial.println(packet.leftMic);
+      Serial.println("Ack");
+      Serial.println("Ack");
+      break;
+    case 3:
+      Serial.print("RMic = ");
+      Serial.println(packet.rightMic);
+      Serial.println("Ack");
+      break;
+    case 4:
+      Serial.print("Heading = ");
+      Serial.println(packet.heading);
+      Serial.println("Ack");
+      break;
+    default:
+      Serial.print("MD = ");
+      Serial.println(packet.microphone_direction);
+      Serial.print("LMic = ");
+      Serial.println(packet.leftMic);
+      Serial.print("RMic = ");
+      Serial.println(packet.rightMic);
+      Serial.print("Heading = ");
+      Serial.println(packet.heading);
+      break;
+  }
+}
 void convertDataIntoPacket(String data)
 {
   String temp = "";
