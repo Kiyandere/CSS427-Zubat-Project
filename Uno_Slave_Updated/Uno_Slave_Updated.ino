@@ -295,7 +295,7 @@ void ReadIncoming()
     {
       dataIn += c;
       newData = true;
-      //Serial.print("We are here \n");
+      Serial.print("We are here \n");
       break;
     }
     else
@@ -490,51 +490,71 @@ void readManual()
   //reset paket
   // resetPacket();
 
-  //0: auto , 1: distance, 2: L mic, 3: R mic, 4: compass
+  //This might be randomly numbered, it's just that I'm too lazy to reorder them - Dai
   switch (input)
   {
-    case 1:
+    //ultrasonic
+    case 5:
       packet.ultrasonic_distance = ultraLocal;
-
+      packet.microphone_direction = -1;
+      packet.leftMic = false;
+      packet.rightMic = false;
+      packet.heading = 0;
       break;
+    
+    //left mic
     case 2:
       packet.leftMic = leftMicLocal;
-
+      packet.microphone_direction = -1;
+      packet.ultrasonic_distance = 0;
+      packet.rightMic = false;
+      packet.heading = 0;
       break;
+
+    //right mic
     case 3:
       packet.rightMic = rightMicLocal;
-
+      packet.microphone_direction = -1;
+      packet.ultrasonic_distance = 0;
+      packet.rightMic = false;
+      packet.heading = 0;
       break;
+
+    //heading
     case 4:
       packet.heading = headingLocal;
+      packet.microphone_direction = -1;
+      packet.ultrasonic_distance = 0;
+      packet.leftMic = false;
+      packet.rightMic = false;
       break;
+
+    //mic location
+    case 1: 
+      packet.heading = 0;
+      packet.microphone_direction = micLocal;
+      packet.ultrasonic_distance = 0;
+      packet.leftMic = false;
+      packet.rightMic = false;
+      break;
+
+    //auto
     default:
       moveLocalToPacket();
       packet.start = true;
-      packet.ack = true;
+      packet.ack = true;  
   }
+
   packet.manual = input;
   incomingPacket.manual = 0;
 }
 
 void loop() {
 
-    // micReading();
-    // Serial.print("location:");
-    // Serial.println(micLocal);
-    // Serial.print("Left mic:");
-    // Serial.println(leftMicLocal);
-    // Serial.print("Right mic:");
-    // Serial.println(rightMicLocal);
-    // stepperReset();
-    // Serial.println();
-    // delay(3000);
-
     micReading();
     ultraReading();
     headingReading();
     stepperReset();
-
 
     wifiRun();
 
