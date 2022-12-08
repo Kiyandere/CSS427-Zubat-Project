@@ -40,7 +40,7 @@ bool ready = false;
 bool received = false;
 
 //Setup softwareSerial
-SoftwareSerial nodeMCU(rxPin, txPin);
+SoftwareSerial Ardunio_SoftSerial(rxPin, txPin);
 
 //------------------------------- Global Variable -------------------------------
 //stepper
@@ -57,7 +57,11 @@ int manual = 0;
 bool ack = false;
 
 bool newData = false;
-
+char c;
+String dataIn = "";
+long prevMillis = 0;
+long interval = 5000;
+bool sendData = false;
 //------------------------------- Pins Define -------------------------------
 //Ultrasonic pins
 #define echoPin 5
@@ -82,7 +86,7 @@ Stepper stepper(stepsPerRevolution, in1, in3, in2, in4);
 void setup() {
   //setup serial first
   Serial.begin(115200);
-  nodeMCU.begin(115200);
+  Ardunio_SoftSerial.begin(57600);
 
   //Ultrasonic for distance
   pinMode (trigPin, OUTPUT);
@@ -163,13 +167,13 @@ void stepperRightTurn()
 {
   int rightTurn = (stepsPerRevolution);
   stepper.step(rightTurn);
-  delay(500);
+  delay(100);
 }
 void stepperLeftTurn()
 {
   int leftTurn = (-stepsPerRevolution);
   stepper.step(leftTurn);
-  delay(500);
+  delay(100);
 }
 void stepperReset()
 {
@@ -233,59 +237,73 @@ void wifiRun()
   bool check = false;
 
   resetPacket();
+  ReadIncoming();
 
-  //getting packet from master
-  if(nodeMCU.available())
+
+
+  if (newData)
   {
+      Serial.println("inside newdata");
+    convertDataIntoPacket(dataIn);
+    populateIncomingPacket();
+    readManual();
+    ready = true;
+    newData = false;
+    
+  }
 
-    readIncomingData();
-    Serial.println("Receiving from Master");
-    if (newData)
+
+  if((millis() - prevMillis) > interval)
+  {
+    prevMillis = millis();
+    sendData = true;
+      Serial.println("inside milli");
+  }
+  if (ready && !newData )
+  {
+    Serial.println("inside ready and !newdata");
+    String send = convertPacketToString();
+    Ardunio_SoftSerial.println(send);
+    ready = false;
+    sendData = false;
+    c = 0;
+    dataIn = "";
+  }
+
+ 
+
+  if(!ready && !newData && sendData)
+  {
+    Serial.println("inside !everything and data");
+    //Send the periodic data
+    readManual();
+    String string = convertPacketToString();
+    Ardunio_SoftSerial.println(string);
+    sendData = false;
+  }
+
+}
+
+
+void ReadIncoming()
+{
+  while(Ardunio_SoftSerial.available() > 0  && newData == false)
+  {
+    c = Ardunio_SoftSerial.read();
+    if(c=='>')
     {
-      readManual();
-      ready = true;
-      Serial.println(ready);
+      dataIn += c;
+      newData = true;
+      //Serial.print("We are here \n");
+      break;
+    }
+    else
+    {
+      dataIn += c;
     }
   }
-  
-  //on demand
-  // if (ready)
-  // {
-  //   String sender = "";
-  //   sender = convertPacketToString();
-  //   nodeMCU.println(sender);
-  //   check = true;
-  // }
-
-  // if(!check)
-  // {
-  //   moveLocalToPacket();
-  //   String sender = "";
-  //   sender = convertPacketToString();
-  //   nodeMCU.println(sender);
-  //   Serial.println(sender);
-  // }
-
-  //sending to master?
-  // if(ready)
-  // {
-  //   Serial.println("Sending from master");
-  //   esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
-  //   ready = false;
-  // }
-
-  //when getting stuff
-  // if(received)
-  // {
-  //   printIncomingReadings();
-  //   cli();
-  //   transferIncomingIntoPacket();
-  //   sei();
-  //   String sendMessage = convertPacketToString();
-  //   nodeMCU.println(sendMessage);
-  //   received = false;
-  // }
 }
+
 
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) 
 {
@@ -319,26 +337,6 @@ void transferIncomingIntoPacket()
   packet.ack = incomingPacket.ack;
 }
 
-
-void readIncomingData()
-{
-  while(nodeMCU.available() > 0)
-  {
-    //Serial.println("We are reading something");
-    char temp = nodeMCU.read();
-    incomingData += String(temp);
-    if(temp == '>')
-    {
-      Serial.println(incomingData);
-      String data = incomingData;
-      curData = incomingData;
-      incomingData  = "";
-      convertDataIntoPacket(data);
-      newData = true;
-      break;
-    }
-  }
-}
 
 void printIncomingReadings()
 {
@@ -392,12 +390,20 @@ void convertDataIntoPacket(String data)
   for(int i = 0; i < data.length(); i++)
   {
     char ch = data.charAt(i);
-    if(ch == '<' || ch == '>')
+    if(ch == '<')
     {
       continue;
     }
+    else if(ch == '>')
+    {
+      //Serial.println(temp);
+      packetArray[count] = temp.toInt();
+      count++;
+      temp = "";
+    }
     else if(ch == ',')
     {
+      //Serial.println(temp);
       packetArray[count] = temp.toInt();
       count++;
       if(count >= sizeof(packetArray))
@@ -412,8 +418,6 @@ void convertDataIntoPacket(String data)
       temp += ch;
     }
   }
-  displayData();
-  populatePacketData();
 }
 
 void populatePacketData()
@@ -426,6 +430,18 @@ void populatePacketData()
   packet.start = packetArray[5];
   packet.manual = packetArray[6];
   packet.ack = packetArray[7];
+}
+
+void populateIncomingPacket()
+{
+  incomingPacket.microphone_direction = packetArray[0];
+  incomingPacket.ultrasonic_distance = packetArray[1];
+  incomingPacket.leftMic = packetArray[2];
+  incomingPacket.rightMic = packetArray[3];
+  incomingPacket.heading = packetArray[4];
+  incomingPacket.start = packetArray[5];
+  incomingPacket.manual = packetArray[6];
+  incomingPacket.ack = packetArray[7];
 }
 
 void displayData()
@@ -484,40 +500,50 @@ void readManual()
   //reset paket
   resetPacket();
 
-  //0: auto , 1: motor, 2: distance, 3: L mic, 4: R mic, 5: compass
+  //0: auto , 1: distance, 2: L mic, 3: R mic, 4: compass
   switch (input)
   {
     case 1:
-      //motor control
-      break;
-    case 2:
       packet.ultrasonic_distance = ultraLocal;
       break;
-    case 3:
+    case 2:
       packet.leftMic = leftMicLocal;
       break;
-    case 4:
+    case 3:
       packet.rightMic = rightMicLocal;
       break;
-    case 5:
+    case 4:
       packet.heading = headingLocal;
       break;
     default:
       moveLocalToPacket();
+
+      packet.start = true;
+      packet.manual = 0;
+      packet.ack = true;
   }
+
+    incomingPacket.manual = 0;
 }
 
 void loop() {
 
+    // micReading();
+    // Serial.print("location:");
+    // Serial.println(micLocal);
+    // Serial.print("Left mic:");
+    // Serial.println(leftMicLocal);
+    // Serial.print("Right mic:");
+    // Serial.println(rightMicLocal);
+    // stepperReset();
+    // Serial.println();
+    // delay(3000);
+
     micReading();
-    Serial.print("location:");
-    Serial.println(micLocal);
-    Serial.print("Left mic:");
-    Serial.println(leftMicLocal);
-    Serial.print("Right mic:");
-    Serial.println(rightMicLocal);
+    ultraReading();
+    headingReading();
     stepperReset();
-    Serial.println();
-    delay(3000);
+
+    wifiRun();
 
 }
