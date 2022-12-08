@@ -35,7 +35,7 @@ bool newData = false;
 bool sendData = false;
 String dataIn = "";
 char c;
-long interval = 2000; //Adjust this for nodeMCU as Sensor will have its own timer
+long interval = 1000; //Adjust this for nodeMCU as Sensor will have its own timer
 long prevMillis = 0;
 //From Mega Sensor Side
 uint8_t broadcastAddress[] = {0x50, 0x02, 0x91, 0xDC, 0xCF, 0x83};
@@ -60,15 +60,18 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   }
   else{
     Serial.println("Delivery fail");
-    ready = true; //Re-Attempt
+    //ready = true; //Re-Attempt
   }
 }
 
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
-  memcpy(&incomingPacket, incomingData, sizeof(incomingPacket));
-  Serial.print("Bytes received: ");
-  Serial.println(len);
-  received = true;
+  if(!received)
+  {
+    memcpy(&incomingPacket, incomingData, sizeof(incomingPacket));
+    Serial.print("Bytes received: ");
+    Serial.println(len);
+    received = true;
+  }
 }
 
 void transferIncomingIntoPacket()
@@ -153,8 +156,12 @@ void loop()
   }
   if(ready && !newData && sendData)   //SendData may not be needed
   {
-    Serial.println("We Sent the data to Master");    
-    esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+    //Serial.println("We Sent the data to Master");  
+    if(!received)  
+    {
+      esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
+      //Serial.println(dataIn);
+    }
     //String sendMessage = convertPacketToString();
     //Serial.println(sendMessage);
     //NodeMcu_SoftSerial.println(sendMessage);    
@@ -165,7 +172,7 @@ void loop()
   }
 
 
-  if(received && !newData && !sendData)
+  if(received && !newData)
   {
     //printIncomingReadings();
    

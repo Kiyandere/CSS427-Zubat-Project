@@ -81,27 +81,27 @@ void readCommand(char command)
       break;
     case '1':
       ready = true;
-      basePacket.start = true;
+      //basePacket.start = true;
       basePacket.manual = 1;
       break;
     case '2':
       ready = true;
-      basePacket.start = true;
+      //basePacket.start = true;
       basePacket.manual = 2;
       break;
     case '3':
       ready = true;
-      basePacket.start = true;
+      //basePacket.start = true;
       basePacket.manual = 3;
       break;
     case '4':
       ready = true;
-      basePacket.start = true;
+      //basePacket.start = true;
       basePacket.manual = 4;
       break;
     case '5':
       ready = true;
-      basePacket.start = true;
+      //basePacket.start = true;
       basePacket.manual = 5;
       break;
   }
@@ -165,7 +165,7 @@ void loop() {
     convertDataIntoPacket(dataIn);
     //displayData();
     newData = false;
-    Serial.println("Incoming Data:");
+    //Serial.println("Incoming Data:");
     Serial.println(dataIn);
     c = 0;
     dataIn = "";
@@ -180,6 +180,7 @@ void checkCommand()
   {
     char temp = Serial.read();
     readCommand(temp);
+    //Serial.print(basePacket.manual);
     sender = convertBasePacketToString();
     break;
   }

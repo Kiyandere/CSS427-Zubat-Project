@@ -60,7 +60,7 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   }
   else{
     Serial.println("Delivery fail");
-    ready = true; //Re-Attempt
+    //ready = true; //Re-Attempt
   }
 }
 
@@ -150,8 +150,8 @@ void loop()
   {
     Serial.println("We Sent the data to Sensor");    
     esp_now_send(broadcastAddress, (uint8_t *) &packet, sizeof(packet));
-    //String sendMessage = convertPacketToString();
-    //Serial.println(sendMessage);
+    String sendMessage = convertPacketToString();
+    Serial.println(sendMessage);
     //NodeMcu_SoftSerial.println(sendMessage);    
     ready = false;
     sendData = false;
@@ -164,7 +164,7 @@ void loop()
   {
     //printIncomingReadings();
    
-    //transferIncomingIntoPacket();
+    transferIncomingIntoPacket();
     //NodeMcu_SoftSerial.println("<3,5,0,1,3,2,0,3>");
     String sendMessage = convertPacketToString();
     //Serial.println(sendMessage);
