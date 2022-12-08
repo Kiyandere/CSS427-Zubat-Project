@@ -236,14 +236,14 @@ void wifiRun()
 {
   bool check = false;
 
-  resetPacket();
+  // resetPacket();
   ReadIncoming();
 
 
 
   if (newData)
   {
-      Serial.println("inside newdata");
+    Serial.println("recieved");
     convertDataIntoPacket(dataIn);
     populateIncomingPacket();
     readManual();
@@ -257,12 +257,13 @@ void wifiRun()
   {
     prevMillis = millis();
     sendData = true;
-      Serial.println("inside milli");
+      //Serial.println("inside milli");
   }
   if (ready && !newData )
   {
-    Serial.println("inside ready and !newdata");
+    //Serial.println("inside ready and !newdata");
     String send = convertPacketToString();
+    Serial.println(send);
     Ardunio_SoftSerial.println(send);
     ready = false;
     sendData = false;
@@ -274,7 +275,7 @@ void wifiRun()
 
   if(!ready && !newData && sendData)
   {
-    Serial.println("inside !everything and data");
+    //Serial.println("inside !everything and data");
     //Send the periodic data
     readManual();
     String string = convertPacketToString();
@@ -420,18 +421,6 @@ void convertDataIntoPacket(String data)
   }
 }
 
-void populatePacketData()
-{
-  packet.microphone_direction = packetArray[0];
-  packet.ultrasonic_distance = packetArray[1];
-  packet.leftMic = packetArray[2];
-  packet.rightMic = packetArray[3];
-  packet.heading = packetArray[4];
-  packet.start = packetArray[5];
-  packet.manual = packetArray[6];
-  packet.ack = packetArray[7];
-}
-
 void populateIncomingPacket()
 {
   incomingPacket.microphone_direction = packetArray[0];
@@ -442,6 +431,7 @@ void populateIncomingPacket()
   incomingPacket.start = packetArray[5];
   incomingPacket.manual = packetArray[6];
   incomingPacket.ack = packetArray[7];
+
 }
 
 void displayData()
@@ -498,32 +488,33 @@ void readManual()
   int input = incomingPacket.manual;
 
   //reset paket
-  resetPacket();
+  // resetPacket();
 
   //0: auto , 1: distance, 2: L mic, 3: R mic, 4: compass
   switch (input)
   {
     case 1:
       packet.ultrasonic_distance = ultraLocal;
+
       break;
     case 2:
       packet.leftMic = leftMicLocal;
+
       break;
     case 3:
       packet.rightMic = rightMicLocal;
+
       break;
     case 4:
       packet.heading = headingLocal;
       break;
     default:
       moveLocalToPacket();
-
       packet.start = true;
-      packet.manual = 0;
       packet.ack = true;
   }
-
-    incomingPacket.manual = 0;
+  packet.manual = input;
+  incomingPacket.manual = 0;
 }
 
 void loop() {
@@ -543,6 +534,7 @@ void loop() {
     ultraReading();
     headingReading();
     stepperReset();
+
 
     wifiRun();
 
