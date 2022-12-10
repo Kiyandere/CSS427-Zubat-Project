@@ -8,7 +8,9 @@
 
 SoftwareSerial Arduino_SoftSerial(10,11);
 int packetArray[8];
-
+int ackCount[7];
+int commandCount[7];
+int TCount = 0;
 char c;
 String dataIn;
 String sender = "";
@@ -75,9 +77,22 @@ void readCommand(char command)
 {
   switch(command){
     case '0':
-      ready = true;
+      ready = false;
       basePacket.start = true;
       basePacket.manual = 0;
+      TCount = 0;
+      commandCount[0] = 0;
+      commandCount[1] = 0;
+      commandCount[2] = 0;
+      commandCount[3] = 0;
+      commandCount[4] = 0;
+      commandCount[5] = 0;
+      ackCount[0] = 0;
+      ackCount[1] = 0;
+      ackCount[2] = 0;
+      ackCount[3] = 0;
+      ackCount[4] = 0;
+      ackCount[5] = 0;
       break;
     case '1':
       ready = true;
@@ -104,6 +119,11 @@ void readCommand(char command)
       //basePacket.start = true;
       basePacket.manual = 5;
       break;
+    default:
+      ready = true;
+      //basePacket.start = true;
+      basePacket.manual = 0;
+      break;      
   }
 }
 
@@ -167,6 +187,7 @@ void loop() {
     Serial.print("--------------");
     Serial.println(dataIn);
     populateIncomingPacketData();
+    ackCount[packet.manual] += 1;
     displayDataToHuman();
     newData = false;
     Serial.println("--------------");
@@ -184,6 +205,10 @@ void checkCommand()
   while(Serial.available() > 0)
   {
     char temp = Serial.read();
+    if(temp == '\n')
+    {
+      break;      
+    }
     readCommand(temp);
     //Serial.print(basePacket.manual);
     sender = convertBasePacketToString();
@@ -191,7 +216,12 @@ void checkCommand()
   }
   if(ready)
   {
-    Serial.println("Sent");
+    TCount++;
+    commandCount[basePacket.manual]++;
+    Serial.print("T Command Sent = ");
+    Serial.println(TCount);
+    Serial.print("Command Sent = ");
+    Serial.println(commandCount[basePacket.manual]);
     Arduino_SoftSerial.print(sender);
     ready = false;
   }
@@ -223,23 +253,32 @@ void displayDataToHuman()
     case 1:
       Serial.print("MD = ");
       Serial.println(packet.microphone_direction);
-      Serial.println("Ack");
+      Serial.print("Ack Count = ");
+      Serial.println(ackCount[manual]);
       break;
     case 2:
       Serial.print("LMic = ");
       Serial.println(packet.leftMic);
-      Serial.println("Ack");
-      Serial.println("Ack");
+      Serial.print("Ack");
+      Serial.println(ackCount[manual]);
       break;
     case 3:
       Serial.print("RMic = ");
       Serial.println(packet.rightMic);
-      Serial.println("Ack");
+      Serial.print("Ack Count = ");
+      Serial.println(ackCount[manual]);
       break;
     case 4:
       Serial.print("Heading = ");
       Serial.println(packet.heading);
-      Serial.println("Ack");
+      Serial.print("Ack Count = ");
+      Serial.println(ackCount[manual]);
+      break;
+    case 5:
+      Serial.print("Ultrasonic = ");
+      Serial.println(packet.ultrasonic_distance);
+      Serial.print("Ack Count = ");
+      Serial.println(ackCount[manual]);
       break;
     default:
       Serial.print("MD = ");
